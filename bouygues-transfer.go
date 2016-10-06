@@ -42,6 +42,20 @@ func orangeTransferPostHandler(w http.ResponseWriter, r *http.Request) {
   transferPostHandler(w, r, cmd)
 }
 
+func mmdmPreprodTransferPostHandler(w http.ResponseWriter, r *http.Request) {
+  var cmd *exec.Cmd
+  cmd = exec.Command(`/usr/bin/sftp`, `-oStrictHostKeyChecking=no`, `-i`, `/home/ubuntu/.ssh/id_dsa_orange`, `-b`, `-`, `AFRMM1@transfert-pp.francetelecom.com:/IN/AFRMM101`)
+
+  transferPostHandler(w, r, cmd)
+}
+
+func mmdmTransferPostHandler(w http.ResponseWriter, r *http.Request) {
+  var cmd *exec.Cmd
+  cmd = exec.Command(`/usr/bin/sftp`, `-oStrictHostKeyChecking=no`, `-i`, `/home/ubuntu/.ssh/id_dsa_orange`, `-b`, `-`, `AFRMMD@transfert.francetelecom.com:/IN/AFRMMD01`)
+
+  transferPostHandler(w, r, cmd)
+}
+
 func transferPostHandler(w http.ResponseWriter, r *http.Request, cmd *exec.Cmd) {
   var err error
   body, _ := ioutil.ReadAll(r.Body)
@@ -92,6 +106,14 @@ func transferPostHandler(w http.ResponseWriter, r *http.Request, cmd *exec.Cmd) 
     return
   }
   defer resp.Body.Close()
+  if resp.StatusCode != 200 {
+    errStr := fmt.Sprintf("Cannot get url %s, HTTP return status code is %d", jt.Url, err)
+    log.Printf(errStr)
+    jsonStr := `{"error":"` + errStr + `"}`
+    w.WriteHeader(http.StatusNotFound)
+    w.Write([]byte(jsonStr))
+    return
+  }
   body, err = ioutil.ReadAll(resp.Body)
   if err != nil {
     log.Printf("XX Cannot ReadAll resp.Body '%#v': %s", body, err)
@@ -138,6 +160,7 @@ func transferPostHandler(w http.ResponseWriter, r *http.Request, cmd *exec.Cmd) 
     w.Write([]byte(jsonStr))
     return
   }
+  log.Printf("run sftp with command: mput %s\nbye\n", filename)
   stdin.Write([]byte(`mput ` + filename + "\n"))
   stdin.Write([]byte(`bye` + "\n"))
   err = cmd.Wait()
@@ -158,6 +181,8 @@ func main() {
   r := mux.NewRouter()
   r.HandleFunc("/api/transfer", bouyguesTransferPostHandler).Methods("POST")
   r.HandleFunc("/api/orangeTransfer", orangeTransferPostHandler).Methods("POST")
+  r.HandleFunc("/api/mmdmPreprodTransfer", mmdmPreprodTransferPostHandler).Methods("POST")
+  r.HandleFunc("/api/mmdmTransfer", mmdmTransferPostHandler).Methods("POST")
 
   http.Handle("/", r)
   http.ListenAndServe(":4001", nil)
