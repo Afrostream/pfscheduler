@@ -25,10 +25,10 @@ import (
 	"github.com/pborman/uuid"
 )
 
-const dbDsn = "pfscheduler:DgE4jfVh65jD34dF@tcp(10.91.83.18:3306)/video_encoding"
-const ffmpegPath = "/usr/bin/ffmpeg"
-const uspPackagePath = "/usr/local/bin/usp_package.sh"
-const outputBasePath = "/space/videos/encoded"
+var dbDsn string
+var ffmpegPath string
+var uspPackagePath string
+var encodedBasePath string
 
 type ContentsStreamsPutJson struct {
   Language	*string	`json:"language"`
@@ -858,7 +858,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
   extension := filepath.Ext(baseContentFilename)
   contentFilenameBase := baseContentFilename[0:len(baseContentFilename) - len(extension)]
 
-  query = fmt.Sprintf("SELECT presetId,CONCAT('%s/origin/vod/%s/%s_',`name`),presetIdDependance,doAnalyze FROM presets AS pr WHERE pr.profileId=? ORDER BY pr.presetIdDependance", outputBasePath, contentFilenameBase, uuid)
+  query = fmt.Sprintf("SELECT presetId,CONCAT('%s/origin/vod/%s/%s_',`name`),presetIdDependance,doAnalyze FROM presets AS pr WHERE pr.profileId=? ORDER BY pr.presetIdDependance", encodedBasePath, contentFilenameBase, uuid)
   stmt, err = db.Prepare(query)
   if err != nil {
     errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
@@ -3861,8 +3861,28 @@ func pfTranscodePostHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-  conn, err := amqp.Dial("amqp://p-afsmsch-001.afrostream.tv/")
-  failOnError(err, "Failed to connect to RabbitMQ")
+  var err error
+  var conn *amqp.Connection
+
+  ffmpegPath = os.Getenv(`FFMPEG_PATH`)
+  uspPackagePath = os.Getenv(`USP_PACKAGE_PATH`)
+  encodedBasePath = os.Getenv(`VIDEOS_ENCODED_BASE_PATH`)
+  mysqlHost := os.Getenv(`MYSQL_HOST`)
+  mysqlUser := os.Getenv(`MYSQL_USER`)
+  mysqlPassword := os.Getenv(`MYSQL_PASSWORD`)
+  dbDsn = fmt.Sprintf("%s:%s@tcp(%s:3306)/video_encoding", mysqlUser, mysqlPassword, mysqlHost)
+  rabbitmqHost := os.Getenv(`RABBITMQ_HOST`)
+  rabbitmqUser := os.Getenv(`RABBITMQ_USER`)
+  rabbitmqPassword := os.Getenv(`RABBITMQ_PASSWORD`)
+
+  first := true
+  for first == true || err != nil {
+    conn, err = amqp.Dial(fmt.Sprintf(`amqp://%s:%s@%s/`, rabbitmqUser, rabbitmqPassword, rabbitmqHost))
+    logOnError(err, "Waiting RabbitMQ to become ready...")
+    time.Sleep(1 * time.Second)
+    first = false
+  }
+
   defer conn.Close()
 
   ch, err := conn.Channel()
