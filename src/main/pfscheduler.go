@@ -3923,9 +3923,9 @@ func main() {
 
   r := mux.NewRouter()
   r.HandleFunc("/{a:.*}", optionsGetHandler).Methods("OPTIONS")
-  r.HandleFunc("/api/contents", contentsGetHandler).Methods("GET").Queries("state", "{state:(initialized|scheduled|processing|failed|ready)}", "uuid", "{uuid:[0-9a-fA-F\\-]+}")
+  r.HandleFunc("/api/contents", contentsGetHandler).Methods("GET").Queries("state", "{state:(?:initialized|scheduled|processing|failed|ready)}", "uuid", "{uuid:[0-9a-fA-F\\-]+}")
   r.HandleFunc("/api/contents", contentsGetHandler).Methods("GET").Queries("uuid", "{uuid:[0-9a-fA-F\\-]+}")
-  r.HandleFunc("/api/contents", contentsGetHandler).Methods("GET").Queries("state", "{state:(initialized|scheduled|processing|failed|ready)}")
+  r.HandleFunc("/api/contents", contentsGetHandler).Methods("GET").Queries("state", "{state:(?:initialized|scheduled|processing|failed|ready)}")
   r.HandleFunc("/api/contents", contentsGetHandler).Methods("GET").Queries("md5Hash", "{md5Hash:[0-9a-f\\-]+}")
   r.HandleFunc("/api/contents", contentsGetHandler).Methods("GET")
   r.HandleFunc("/api/contents", contentsPostHandler).Methods("POST")
