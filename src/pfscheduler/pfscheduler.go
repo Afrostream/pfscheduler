@@ -59,7 +59,7 @@ func initChecks() {
 }
 
 func createSchedulerExchangerTask() tasks.SchedulerExchangerTask {
-	log.Println("-- SchedulerExchangerTask calling...")
+	log.Println("-- createSchedulerExchangerTask calling...")
 	rabbitmqHost := os.Getenv("RABBITMQ_HOST")
 	rabbitmqUser := os.Getenv("RABBITMQ_USER")
 	rabbitmqPassword := os.Getenv("RABBITMQ_PASSWORD")
@@ -69,14 +69,14 @@ func createSchedulerExchangerTask() tasks.SchedulerExchangerTask {
 	}
 	schedulerExchangerTask := tasks.NewSchedulerExchangerTask(rabbitmqHost, rabbitmqPort, rabbitmqUser, rabbitmqPassword)
 	schedulerExchangerTask.Init()
-	log.Println("-- SchedulerExchangerTask calling done successfully")
+	log.Println("-- createSchedulerExchangerTask calling done successfully")
 	return schedulerExchangerTask
 }
 
 func createSchedulerHttpServerTask() tasks.SchedulerHttpServerTask {
-	log.Println("-- SchedulerHttpServerTask calling...")
+	log.Println("-- createSchedulerHttpServerTask calling...")
 	schedulerHttpServerTask := tasks.NewSchedulerHttpServerTask()
 	schedulerHttpServerTask.Init()
-	log.Println("-- SchedulerHttpServerTask calling done successfully")
+	log.Println("-- createSchedulerHttpServerTask calling done successfully")
 	return schedulerHttpServerTask
 }

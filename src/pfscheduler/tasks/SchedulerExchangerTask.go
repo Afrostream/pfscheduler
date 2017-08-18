@@ -248,7 +248,7 @@ func (e *SchedulerExchangerTask) sendEncodingTasks() {
 					}
 					log.Printf("-- Encoder '%s' will take the task assetId %d", hostname, assetId)
 					body := fmt.Sprintf(`{ "hostname": "%s", "assetId": %d }`, hostname, assetId)
-					e.publishExchange(e.currentChannel, e.currentQueue.Name, body)
+					e.publishExchange(body)
 				}
 			}
 
@@ -317,13 +317,13 @@ func (e *SchedulerExchangerTask) sendEncodingTasks() {
 	}()
 }
 
-func (e *SchedulerExchangerTask) publishExchange(ch *amqp.Channel, key string, msg string) (err error) {
+func (e *SchedulerExchangerTask) publishExchange(msg string) (err error) {
 	log.Printf("-- SchedulerExchangerTask : Sending message '%s' on afsm-encoders queue...", msg)
-	err = ch.Publish(
-		"afsm-encoders", // exchange
-		key,             // routing key
-		false,           // mandatory
-		false,           // immediate
+	err = e.currentChannel.Publish(
+		"afsm-encoders",     // exchange
+		e.currentQueue.Name, // routing key
+		false,               // mandatory
+		false,               // immediate
 		amqp.Publishing{
 			ContentType: "text/plain",
 			Body:        []byte(msg),

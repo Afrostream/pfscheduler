@@ -108,7 +108,6 @@ func (h *SchedulerHttpServerTask) Start() {
 		return
 	}
 	log.Printf("-- SchedulerHttpServerTask Thread starting...")
-	//
 	//http.ListenAndServe(":4000", handlers.CORS()(r))
 	go http.ListenAndServe(":4000", nil)
 	//
@@ -118,13 +117,16 @@ func (h *SchedulerHttpServerTask) Start() {
 /* Handlers */
 
 func (h *SchedulerHttpServerTask) optionsGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- optionsGetHandler...")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	log.Printf("-- optionsGetHandler done successfully")
 }
 
 // API Handlers
 func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- contentsGetHandler...")
 	var err error
 	params := mux.Vars(r)
 	w.Header().Set("Content-Type", "application/json")
@@ -322,9 +324,11 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 		jsonAnswer = "[ ]"
 	}
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- contentsGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- contentsPostHandler...")
 	body, _ := ioutil.ReadAll(r.Body)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -457,9 +461,11 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	jsonAnswer := fmt.Sprintf(`{"contentId":%d,"uuid":"%s"}`, contentId, uuid)
 
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- contentsPostHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- contentsStreamsGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -544,9 +550,11 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 		jsonAnswer = "[ ]"
 	}
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- contentsStreamsGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- assetsStreamsGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -675,9 +683,11 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 		jsonAnswer = "[ ]"
 	}
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- assetsStreamsGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- assetsGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -831,9 +841,11 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 		jsonAnswer = "[ ]"
 	}
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- assetsGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- ffmpegLogsGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -916,9 +928,11 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 		jsonAnswer = "[" + jsonAnswer + "]"
 	}
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- ffmpegLogsGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- ffmpegProgressGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -1001,9 +1015,11 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 		jsonAnswer = "[" + jsonAnswer + "]"
 	}
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- ffmpegProgressGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- assetsStreamsPostHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -1160,9 +1176,11 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 	}
 	jsonAnswer = `{"result":"success"}`
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- assetsStreamsPostHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- encodersGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -1245,9 +1263,11 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 		jsonAnswer = "[" + jsonAnswer + "]"
 	}
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- encodersGetHandler done successfuly")
 }
 
 func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- presetsGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -1347,9 +1367,11 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 		jsonAnswer = "[" + jsonAnswer + "]"
 	}
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- presetsGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- profilesGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -1432,9 +1454,11 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 		jsonAnswer = "[" + jsonAnswer + "]"
 	}
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- profilesGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- contentsStreamsPostHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -1573,9 +1597,11 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 	}
 	jsonAnswer = `{"result":"success"}`
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- contentsStreamsPostHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) contentsStreamsPutHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- contentsStreamsPutHandler...")
 	var err error
 	body, _ := ioutil.ReadAll(r.Body)
 	w.Header().Set("Content-Type", "application/json")
@@ -1630,9 +1656,11 @@ func (h *SchedulerHttpServerTask) contentsStreamsPutHandler(w http.ResponseWrite
 
 	jsonStr := `{"result":"success"}`
 	w.Write([]byte(jsonStr))
+	log.Printf("-- contentsStreamsPutHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- contentsMd5PostHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -1709,11 +1737,12 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 
 	jsonStr := `{"result":"success"}`
 	w.Write([]byte(jsonStr))
-
+	log.Printf("-- contentsMd5PostHandler done sucessfully")
 	return
 }
 
 func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- profilesParametersGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -1799,9 +1828,11 @@ func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWr
 		jsonAnswer = "[" + jsonAnswer + "]"
 	}
 	w.Write([]byte(jsonAnswer))
+	log.Printf("-- profilesParametersGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- packagePostHandler...")
 	var err error
 	body, _ := ioutil.ReadAll(r.Body)
 	w.Header().Set("Content-Type", "application/json")
@@ -1869,9 +1900,11 @@ func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *h
 
 	jsonStr := `{"success":true}`
 	w.Write([]byte(jsonStr))
+	log.Printf("-- packagePostHandler done sucessfully")
 }
 
 func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- transcodePostHandler...")
 	body, _ := ioutil.ReadAll(r.Body)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -1883,9 +1916,10 @@ func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
+		/*jsonStr := `{"error":"` + err.Error() + `"}`
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		w.Write([]byte(jsonStr))*/
+		sendError(w, err.Error())
 		return
 	}
 	var errMsg []string
@@ -1926,9 +1960,11 @@ func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r 
 
 	if err == nil {
 	}
+	log.Printf("-- transcodePostHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- pfManifestGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -2024,11 +2060,12 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 	}
 	jsonStr := `{"error":"manifest not found or not ready"}`
 	w.Write([]byte(jsonStr))
-
+	log.Printf("-- pfManifestGetHandler done sucessfully")
 	return
 }
 
 func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- pfAssetsChannelsGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -2120,11 +2157,12 @@ func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWrit
 	}
 	jsonStr += `]}`
 	w.Write([]byte(jsonStr))
-
+	log.Printf("-- pfAssetsChannelsGetHandler done successfully")
 	return
 }
 
 func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- pfSubtitlesGetHandler...")
 	var err error
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -2232,11 +2270,12 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	}
 	jsonStr += `]}`
 	w.Write([]byte(jsonStr))
-
+	log.Printf("-- pfSubtitlesGetHandler done successfully")
 	return
 }
 
 func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- pfSubtitlesPostHandler...")
 	var filesToMove []string
 
 	body, _ := ioutil.ReadAll(r.Body)
@@ -2562,11 +2601,12 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 
 	jsonStr := `{"result":"success"}`
 	w.Write([]byte(jsonStr))
-
+	log.Printf("-- pfSubtitlesPostHandler done successfully")
 	return
 }
 
 func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- pfContentsStreamsPostHandler...")
 	body, _ := ioutil.ReadAll(r.Body)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -2577,9 +2617,10 @@ func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWr
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
+		/*jsonStr := `{"error":"` + err.Error() + `"}`
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		w.Write([]byte(jsonStr))*/
+		sendError(w, err.Error())
 		return
 	}
 
@@ -2637,24 +2678,25 @@ func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWr
 
 	jsonStr := `{"result":"success"}`
 	w.Write([]byte(jsonStr))
-
+	log.Printf("-- pfContentsStreamsPostHandler done successfully")
 	return
 }
 
 func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- pfTranscodePostHandler...")
 	body, _ := ioutil.ReadAll(r.Body)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	var jt JsonTranscode
-	err := json.Unmarshal(body, &jt)
+	jt, err := newJsonTranscodeFromBytes(body)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
+		errStr := fmt.Sprintf("pfTranscodePostHandler : Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
+		/*jsonStr := `{"error":"` + err.Error() + `"}`
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		w.Write([]byte(jsonStr))*/
+		sendError(w, err.Error())
 		return
 	}
 
@@ -2889,13 +2931,14 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		w.Write([]byte(jsonStr))
 		return
 	}
-
+	log.Printf("-- pfTranscodePostHandler done successfully")
 	return
 }
 
 /* TOOLS */
 
 func getVideoFileInformations(filename string) (vfi VideoFileInfo, err error) {
+	log.Printf("-- getVideoFileInformations...")
 	vfi.Stat, err = os.Stat(filename)
 	if err != nil {
 		return
@@ -3000,11 +3043,12 @@ func getVideoFileInformations(filename string) (vfi VideoFileInfo, err error) {
 	}
 
 	log.Printf("ffmpeg info struct is %+v", vfi)
-
+	log.Printf("-- getVideoFileInformations done successfully")
 	return
 }
 
 func packageContents(contentUuids []ContentsUuid) (errSave error) {
+	log.Printf("-- packageContents...")
 	var stmt *sql.Stmt
 	var err error
 	log.Printf("contentUuids=%#v", contentUuids)
@@ -3059,11 +3103,12 @@ func packageContents(contentUuids []ContentsUuid) (errSave error) {
 			continue
 		}
 	}
-
+	log.Printf("-- packageContents done successfully")
 	return errSave
 }
 
 func uuidToContentId(uuid string) (contentId int, err error) {
+	log.Printf("-- uuidToContentId...")
 	db := database.OpenDb()
 	defer db.Close()
 
@@ -3080,11 +3125,12 @@ func uuidToContentId(uuid string) (contentId int, err error) {
 		log.Printf("XX Cannot query row %s with query %s: %s", uuid, query, err)
 		return
 	}
-
+	log.Printf("-- uuidToContentId done successfully")
 	return
 }
 
 func getSubtitles(url string, dest string) (err error) {
+	log.Printf("-- getSubtitles...")
 	var resp *http.Response
 	log.Printf("fetch subtitle at url %s to %s", url, dest)
 	resp, err = http.Get(url)
@@ -3109,11 +3155,12 @@ func getSubtitles(url string, dest string) (err error) {
 	if err != nil {
 		return
 	}
-
+	log.Printf("-- getSubtitles done successfully")
 	return
 }
 
 func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{}, contentId int) (err error) {
+	log.Printf("-- transcode...")
 	err = nil
 	db := database.OpenDb()
 	defer db.Close()
@@ -3426,11 +3473,12 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	jsonAnswer = jsonAnswer[:len(jsonAnswer)-1] + `]}`
 
 	w.Write([]byte(jsonAnswer))
-
+	log.Printf("-- transcode done successfully")
 	return
 }
 
 func md5HashToContentId(md5Hash string) (contentId int, err error) {
+	log.Printf("-- md5HashToContentId...")
 	db := database.OpenDb()
 	defer db.Close()
 
@@ -3447,6 +3495,19 @@ func md5HashToContentId(md5Hash string) (contentId int, err error) {
 		log.Printf("XX Cannot query row %s with query %s: %s", md5Hash, query, err)
 		return
 	}
-
+	log.Printf("-- md5HashToContentId done successfully")
 	return
 }
+
+/* Tools (NEW) */
+
+func sendError(w http.ResponseWriter, error string) {
+	jsonStr := `{"error":"` + error + `"}`
+	w.WriteHeader(http.StatusNotFound)
+	w.Write([]byte(jsonStr))
+}
+
+//TODO : NCO : later...
+/*func sendSuccess(w http.ResponseWriter) {
+	
+}*/
