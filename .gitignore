@@ -2,3 +2,9 @@
 *.prefs
 
 bin
+
+.idea
+
+pkg
+
+
