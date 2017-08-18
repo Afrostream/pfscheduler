@@ -16,13 +16,13 @@ func main() {
 	initGlobals()
 
 	initChecks()
-	
+
 	/* create tasks */
 	schedulerExchangerTask := createSchedulerExchangerTask()
 	schedulerHttpServerTask := createSchedulerHttpServerTask()
-	
+
 	/* all is ok, start tasks */
-	
+
 	schedulerExchangerTask.Start()
 	schedulerHttpServerTask.Start()
 
@@ -51,12 +51,10 @@ func initGlobals() {
 func initChecks() {
 	log.Println("-- initChecks starting...")
 	//TODO : binaries are functional
-	//database is up
-	db, err := database.OpenGormDbOnce()
-	if err != nil {
-		panic(err)
-	}
+	//database check (blocked until database is started)
+	db := database.OpenGormDb()
 	defer db.Close()
+	//rabbitMQ check (later)
 	log.Println("-- initChecks done successfully")
 }
 
