@@ -15,6 +15,7 @@ func OpenGormDb() (db *gorm.DB) {
 	for {
 		db, err := gorm.Open("mysql", DbDsn)
 		if err == nil {
+			db.LogMode(true)
 			return db
 		}
 		tools.LogOnError(err, "Failed to connect to the database %s, error=%s, retrying...", DbDsn, err)

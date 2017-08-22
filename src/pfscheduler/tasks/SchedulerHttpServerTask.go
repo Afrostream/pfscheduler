@@ -127,203 +127,76 @@ func (h *SchedulerHttpServerTask) optionsGetHandler(w http.ResponseWriter, r *ht
 // API Handlers
 func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- contentsGetHandler...")
-	var err error
 	params := mux.Vars(r)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	id := -1
-	profileId := -1
-	md5Hash := ""
+	contents := []*database.Content{}
+	//
+	db := database.OpenGormDb()
+	defer db.Close()
+	req := db
+	//
 	if params["id"] != "" {
-		id, err = strconv.Atoi(params["id"])
+		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX cannot convert id value '%s' to int: %s", id, err)
+			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", id, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
+		log.Printf("-- contentsGetHandler, id=%d", id)
+		req = req.Where(database.Content{ID: id})
 	}
 	if params["profileId"] != "" {
-		profileId, err = strconv.Atoi(params["profileId"])
+		profileId, err := strconv.Atoi(params["profileId"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX cannot convert profileId value '%s' to int: %s", profileId, err)
+			errStr := fmt.Sprintf("Cannot convert profileId value '%s' to int: %s", profileId, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
+		log.Printf("-- contentsGetHandler, profileId=%d", profileId)
+		req = req.Joins("JOIN contentsProfiles ON contentsProfiles.contentId = contents.contentId").Where("contentsProfiles.profileId = ?", profileId)
+
 	}
 	if params["md5Hash"] != "" {
-		md5Hash = params["md5Hash"]
+		md5Hash := params["md5Hash"]
+		log.Printf("-- contentsGetHandler, md5Hash=%s", md5Hash)
+		req = req.Where(&database.Content{Md5Hash: md5Hash})
 	}
-	db := database.OpenDb()
-	defer db.Close()
-
-	var query string
-	if md5Hash != "" {
-		query = "SELECT * FROM contents WHERE md5Hash=?"
-	} else {
-		if id >= 0 {
-			query = "SELECT * FROM contents WHERE contentId=?"
-			if params["state"] != "" {
-				query += " AND state=?"
-			}
-			if params["uuid"] != "" {
-				query += " AND uuid=?"
-			}
-		} else {
-			if profileId >= 0 {
-				query = "SELECT c.* FROM contents AS c LEFT JOIN contentsProfiles AS cp ON c.contentId=cp.contentId WHERE cp.profileId=?"
-				id = profileId
-				if params["state"] != "" {
-					query += " AND c.state=?"
-				}
-				if params["uuid"] != "" {
-					query += " AND c.uuid=?"
-				}
-			} else {
-				query = "SELECT * FROM contents"
-				if params["state"] != "" && params["uuid"] != "" {
-					query += " WHERE state=? AND uuid=?"
-				} else {
-					if params["state"] != "" {
-						query += " WHERE state=?"
-					} else {
-						if params["uuid"] != "" {
-							query += " WHERE uuid=?"
-						}
-					}
-				}
-			}
+	if params["state"] != "" {
+		state := params["state"]
+		log.Printf("-- contentsGetHandler, state=%s", state)
+		req = req.Where(&database.Content{State: state})
+	}
+	if params["uuid"] != "" {
+		uuid := params["uuid"]
+		log.Printf("-- contentsGetHandler, uuid=%s", uuid)
+		req = req.Where(&database.Content{Uuid: uuid})
+	}
+	//
+	req.Find(&contents)
+	for _, content := range contents {
+		contentsProfiles := []*database.ContentsProfile{}
+		req := db
+		req = req.Where(database.ContentsProfile{ContentId: content.ID})
+		req.Find(&contentsProfiles)
+		for _, contentsProfile := range contentsProfiles {
+			content.ProfileIds = append(content.ProfileIds, contentsProfile.ProfileId)
 		}
 	}
-
-	log.Printf("Query is %s", query)
-	stmt, err := db.Prepare(query)
+	//
+	result, err := json.Marshal(contents)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
+		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
-	defer stmt.Close()
-	var rows *sql.Rows
-	if md5Hash != "" {
-		rows, err = stmt.Query(md5Hash)
-	} else {
-		if id == -1 {
-			if params["uuid"] != "" && params["state"] != "" {
-				rows, err = stmt.Query(params["state"], params["uuid"])
-			} else {
-				if params["state"] != "" {
-					rows, err = stmt.Query(params["state"])
-				} else {
-					if params["uuid"] != "" {
-						rows, err = stmt.Query(params["uuid"])
-					} else {
-						rows, err = stmt.Query()
-					}
-				}
-			}
-		} else {
-			if params["uuid"] != "" && params["state"] != "" {
-				rows, err = stmt.Query(id, params["state"], params["uuid"])
-			} else {
-				if params["state"] != "" {
-					rows, err = stmt.Query(id, params["state"])
-				} else {
-					if params["uuid"] != "" {
-						rows, err = stmt.Query(id, params["uuid"])
-					} else {
-						rows, err = stmt.Query(id)
-					}
-				}
-			}
-		}
-	}
-
-	defer rows.Close()
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
-		return
-	}
-	jsonAnswer := ""
-	rowsNumber := 0
-	for rows.Next() {
-		var c database.Content
-		err = rows.Scan(&c.ID, &c.Uuid, &c.Md5Hash, &c.Filename, &c.State, &c.Size, &c.Duration, &c.UspPackage, &c.Drm, &c.CreatedAt, &c.UpdatedAt)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows result for query %s: %s", query, err)
-			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
-			return
-		}
-		query = "SELECT profileId FROM contentsProfiles WHERE contentId=?"
-		stmt, err = db.Prepare(query)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
-			return
-		}
-		defer stmt.Close()
-		var rows2 *sql.Rows
-		rows2, err = stmt.Query(c.ID)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
-			return
-		}
-		defer rows2.Close()
-		var profileId int
-		for rows2.Next() {
-			err = rows2.Scan(&profileId)
-			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot scan rows result for query %s: %s", query, err)
-				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
-				return
-			}
-			c.ProfileIds = append(c.ProfileIds, profileId)
-		}
-		b, err := json.Marshal(c)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", c, err)
-			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
-			return
-		}
-		jsonAnswer += string(b) + ","
-		rowsNumber++
-	}
-	if rowsNumber > 0 {
-		jsonAnswer = "[" + jsonAnswer[:len(jsonAnswer)-1] + "]"
-	} else {
-		jsonAnswer = "[ ]"
-	}
-	w.Write([]byte(jsonAnswer))
+	log.Printf("-- contentsGetHandler, result=%s", result)
+	w.Write([]byte(result))
 	log.Printf("-- contentsGetHandler done successfully")
 }
 
@@ -339,9 +212,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 
@@ -351,7 +222,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 		errMsg = append(errMsg, "'filename' is missing")
 	}
 	if errMsg != nil {
-		w.Write([]byte(`{"error":"` + strings.Join(errMsg, ",") + `"}`))
+		sendError(w, strings.Join(errMsg, ","))
 		return
 	}
 
@@ -364,9 +235,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot get informations from file %s: %s", *jcc.Filename, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 
@@ -375,9 +244,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot execute md5sum on %s: %s", *jcc.Filename, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	md5 := strings.Split(string(md5sum), ` `)[0]
@@ -388,9 +255,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -398,9 +263,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	if err != nil {
 		errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%d,%d): %s", query, uuid, *jcc.Filename, vfi.Stat.Size(), vfi.Duration, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	var contentId int64
@@ -408,9 +271,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot get the last insert contentId with %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 
@@ -419,18 +280,14 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		_, err = stmt.Exec(contentId, vs.Id, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Error during query execution %s with (%d,%s,%s,%s,%s,%s,%s,%s,%s,%s): %s", query, contentId, vs.Id, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			stmt.Close()
 			return
 		}
@@ -441,18 +298,14 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		_, err = stmt.Exec(contentId, as.Id, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%s,%s,%s,%s,%s): %s", query, contentId, as.Id, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			stmt.Close()
 			return
 		}
@@ -478,9 +331,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert id %s: %s", params["id"], err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -498,9 +349,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -514,9 +363,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -527,18 +374,14 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(s)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", s, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		jsonAnswer += string(b) + ","
@@ -571,9 +414,7 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert id %s: %s", params["id"], err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -582,9 +423,7 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert contentId %s: %s", params["contentId"], err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -623,9 +462,7 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -647,9 +484,7 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -660,18 +495,14 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(s)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", s, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		jsonAnswer += string(b) + ","
@@ -703,9 +534,7 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -714,9 +543,7 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert contentId value '%s' to int: %s", contentId, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -725,9 +552,7 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert profileId value '%s' to int: %s", profileId, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -777,9 +602,7 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -805,9 +628,7 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -818,18 +639,14 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(a)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", a, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		jsonAnswer += string(b) + ","
@@ -858,9 +675,7 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -877,9 +692,7 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -893,9 +706,7 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -906,18 +717,14 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(fl)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", fl, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		jsonAnswer += string(b) + ","
@@ -945,9 +752,7 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert assetId value '%s' to int: %s", assetId, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -964,9 +769,7 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -980,9 +783,7 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -993,18 +794,14 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(fp)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", fp, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		jsonAnswer += string(b) + ","
@@ -1032,9 +829,7 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert id %s: %s", params["id"], err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -1052,9 +847,7 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -1067,9 +860,7 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -1081,9 +872,7 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		var vfi VideoFileInfo
@@ -1099,37 +888,31 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 				if err != nil {
 					errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 					log.Printf(errStr)
-					jsonStr := `{"error":"` + err.Error() + `"}`
-					w.WriteHeader(http.StatusNotFound)
-					w.Write([]byte(jsonStr))
+					sendError(w, err.Error())
 					return
 				}
 				_, err = stmt.Exec(assetId, vs.Id, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps)
 				if err != nil {
 					/*query = "UPDATE assetsStreams SET language=?,codec=?,codecInfo=?,codecProfile=?,bitrate=?,width=?,height=?,fps=?,updatedAt=NOW() WHERE assetId=? AND mapId=? AND type='video'"
-					  var stmt2 *sql.Stmt
-					  stmt2, err = db.Prepare(query)
-					  if err != nil {
-					    errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-					    log.Printf(errStr)
-					    jsonStr := `{"error":"` + err.Error() + `"}`
-					    w.WriteHeader(http.StatusNotFound)
-					    w.Write([]byte(jsonStr))
-					    stmt.Close()
-					    return
-					  }
-					  _, err = stmt2.Exec(vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, assetId, vs.Id)
-					  if err != nil {
-					    errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%s,%s,%s,%s,%s,%s) WHERE (%d,%s): %s", query, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, assetId, vs.Id, err)
-					    log.Printf(errStr)
-					    jsonStr := `{"error":"` + err.Error() + `"}`
-					    w.WriteHeader(http.StatusNotFound)
-					    w.Write([]byte(jsonStr))
-					    stmt2.Close()
-					    stmt.Close()
-					    return
-					  }
-					  stmt2.Close()*/
+										  var stmt2 *sql.Stmt
+										  stmt2, err = db.Prepare(query)
+										  if err != nil {
+										    errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
+										    log.Printf(errStr)
+					sendError(w, err.Error())
+										    stmt.Close()
+										    return
+										  }
+										  _, err = stmt2.Exec(vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, assetId, vs.Id)
+										  if err != nil {
+										    errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%s,%s,%s,%s,%s,%s) WHERE (%d,%s): %s", query, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, assetId, vs.Id, err)
+										    log.Printf(errStr)
+					sendError(w, err.Error())
+										    stmt2.Close()
+										    stmt.Close()
+										    return
+										  }
+										  stmt2.Close()*/
 				}
 				stmt.Close()
 			}
@@ -1138,37 +921,31 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 				if err != nil {
 					errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 					log.Printf(errStr)
-					jsonStr := `{"error":"` + err.Error() + `"}`
-					w.WriteHeader(http.StatusNotFound)
-					w.Write([]byte(jsonStr))
+					sendError(w, err.Error())
 					return
 				}
 				_, err = stmt.Exec(assetId, as.Id, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency)
 				if err != nil {
 					/*query = "UPDATE assetsStreams SET language=?,codec=?,codecInfo=?,bitrate=?,frequency=?,updatedAt=NOW() WHERE assetId=? AND mapId=? AND type='audio'"
-					  var stmt2 *sql.Stmt
-					  stmt2, err = db.Prepare(query)
-					  if err != nil {
-					    errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-					    log.Printf(errStr)
-					    jsonStr := `{"error":"` + err.Error() + `"}`
-					    w.WriteHeader(http.StatusNotFound)
-					    w.Write([]byte(jsonStr))
-					    stmt.Close()
-					    return
-					  }
-					  _, err = stmt2.Exec(as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, assetId, as.Id)
-					  if err != nil {
-					    errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%s,%s,%s) WHERE (%d,%s): %s", query, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, assetId, as.Id, err)
-					    log.Printf(errStr)
-					    jsonStr := `{"error":"` + err.Error() + `"}`
-					    w.WriteHeader(http.StatusNotFound)
-					    w.Write([]byte(jsonStr))
-					    stmt2.Close()
-					    stmt.Close()
-					    return
-					  }
-					  stmt2.Close()*/
+										  var stmt2 *sql.Stmt
+										  stmt2, err = db.Prepare(query)
+										  if err != nil {
+										    errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
+										    log.Printf(errStr)
+					sendError(w, err.Error())
+										    stmt.Close()
+										    return
+										  }
+										  _, err = stmt2.Exec(as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, assetId, as.Id)
+										  if err != nil {
+										    errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%s,%s,%s) WHERE (%d,%s): %s", query, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, assetId, as.Id, err)
+										    log.Printf(errStr)
+					sendError(w, err.Error())
+										    stmt2.Close()
+										    stmt.Close()
+										    return
+										  }
+										  stmt2.Close()*/
 				}
 				stmt.Close()
 			}
@@ -1193,9 +970,7 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -1212,9 +987,7 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -1228,9 +1001,7 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -1241,18 +1012,14 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(e)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", e, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		jsonAnswer += string(b) + ","
@@ -1281,9 +1048,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -1292,9 +1057,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert profileId value '%s' to int: %s", profileId, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -1316,9 +1079,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -1332,9 +1093,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -1345,18 +1104,14 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(p)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", p, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		jsonAnswer += string(b) + ","
@@ -1384,9 +1139,7 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -1403,9 +1156,7 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -1419,9 +1170,7 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -1432,18 +1181,14 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(p)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", p, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		jsonAnswer += string(b) + ","
@@ -1472,9 +1217,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert contentId %s: %s", params["contentId"], err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -1488,9 +1231,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -1499,9 +1240,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s (%d): %s", query, contentId, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -1512,9 +1251,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		var vfi VideoFileInfo
@@ -1529,9 +1266,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 			defer stmt.Close()
@@ -1542,9 +1277,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 				if err != nil {
 					errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 					log.Printf(errStr)
-					jsonStr := `{"error":"` + err.Error() + `"}`
-					w.WriteHeader(http.StatusNotFound)
-					w.Write([]byte(jsonStr))
+					sendError(w, err.Error())
 					return
 				}
 				defer stmt.Close()
@@ -1552,9 +1285,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 				if err != nil {
 					errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%s,%s,%s,%s,%s,%s) WHERE (%d,%s): %s", query, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, contentId, vs.Id, err)
 					log.Printf(errStr)
-					jsonStr := `{"error":"` + err.Error() + `"}`
-					w.WriteHeader(http.StatusNotFound)
-					w.Write([]byte(jsonStr))
+					sendError(w, err.Error())
 					return
 				}
 			}
@@ -1564,9 +1295,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 			defer stmt.Close()
@@ -1577,9 +1306,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 				if err != nil {
 					errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 					log.Printf(errStr)
-					jsonStr := `{"error":"` + err.Error() + `"}`
-					w.WriteHeader(http.StatusNotFound)
-					w.Write([]byte(jsonStr))
+					sendError(w, err.Error())
 					return
 				}
 				defer stmt.Close()
@@ -1587,9 +1314,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 				if err != nil {
 					errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%s,%s,%s,%s,%s) WHERE (%d,%s): %s", query, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, contentId, as.Id, err)
 					log.Printf(errStr)
-					jsonStr := `{"error":"` + err.Error() + `"}`
-					w.WriteHeader(http.StatusNotFound)
-					w.Write([]byte(jsonStr))
+					sendError(w, err.Error())
 					return
 				}
 			}
@@ -1613,17 +1338,13 @@ func (h *SchedulerHttpServerTask) contentsStreamsPutHandler(w http.ResponseWrite
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	if cspj.Language == nil {
 		errStr := fmt.Sprintf("XX Language JSON parameter is missing")
 		log.Printf(errStr)
-		jsonStr := `{"error":"'language' parameter is missing"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	params := mux.Vars(r)
@@ -1638,9 +1359,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPutHandler(w http.ResponseWrite
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -1648,9 +1367,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPutHandler(w http.ResponseWrite
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 
@@ -1676,9 +1393,7 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -1687,9 +1402,7 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot execute query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -1700,9 +1413,7 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan row for query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		md5sum, err := exec.Command(`/usr/bin/md5sum`, filename).Output()
@@ -1718,18 +1429,14 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		_, err = stmt2.Exec(md5, contentId)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot execute query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			stmt2.Close()
 			return
 		}
@@ -1755,9 +1462,7 @@ func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWr
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -1775,9 +1480,7 @@ func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWr
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -1791,9 +1494,7 @@ func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWr
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -1804,18 +1505,14 @@ func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWr
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(pp)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", pp, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		jsonAnswer += string(b) + ","
@@ -1844,9 +1541,7 @@ func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *h
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	var errMsg []string
@@ -1855,7 +1550,7 @@ func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *h
 		errMsg = append(errMsg, "'contentId' is missing")
 	}
 	if errMsg != nil {
-		w.Write([]byte(`{"error":"` + strings.Join(errMsg, ",") + `"}`))
+		sendError(w, strings.Join(errMsg, ","))
 		return
 	}
 	db := database.OpenDb()
@@ -1869,9 +1564,7 @@ func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *h
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		defer stmt.Close()
@@ -1879,9 +1572,7 @@ func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *h
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot query row for query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		cuuid.ContentId = cId
@@ -1892,9 +1583,7 @@ func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *h
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot pacakge contents %#v: %s", cuuids, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 
@@ -1916,9 +1605,6 @@ func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
-		/*jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))*/
 		sendError(w, err.Error())
 		return
 	}
@@ -1928,7 +1614,7 @@ func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r 
 		errMsg = append(errMsg, "'profileId' is missing")
 	}
 	if errMsg != nil {
-		w.Write([]byte(`{"error":"` + strings.Join(errMsg, ",") + `"}`))
+		sendError(w, strings.Join(errMsg, ","))
 		return
 	}
 
@@ -1938,9 +1624,7 @@ func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot get contenId from uuid %s: %s", params["uuid"], err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -1949,9 +1633,7 @@ func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot get contenId from md5Hash %s: %s", m["md5Hash"].(string), err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -1974,17 +1656,13 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 	if params["broadcaster"] == "" {
 		errStr := fmt.Sprintf("XX broadcaster JSON parameter is missing")
 		log.Printf(errStr)
-		jsonStr := `{"error":"'broadcaster' parameter is missing"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, "'broadcaster' parameter is missing")
 		return
 	}
 	if params["contentId"] == "" {
 		errStr := fmt.Sprintf("XX contentId JSON parameter is missing")
 		log.Printf(errStr)
-		jsonStr := `{"error":"'contentId' parameter is missing"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, "'contentId' parameter is missing")
 		return
 	}
 
@@ -1997,9 +1675,7 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -2009,9 +1685,7 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot Scan result query %s with (%s, %s): %s", query, params["contentId"], strings.ToUpper(params["broadcaster"]), err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	if state == `ready` {
@@ -2021,9 +1695,7 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		defer stmt.Close()
@@ -2033,9 +1705,7 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot Scan result query %s with (%s): %s", query, params["contentId"], err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		filename := filenamePath[len(path.Dir(filenamePath))+1:]
@@ -2052,14 +1722,11 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 		} else {
 			errStr := fmt.Sprintf("XX Cannot found ism package from cmdLine")
 			log.Printf(errStr)
-			jsonStr := `{"error":"cannot found ism package from db"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, "cannot found ism package from db")
 			return
 		}
 	}
-	jsonStr := `{"error":"manifest not found or not ready"}`
-	w.Write([]byte(jsonStr))
+	sendError(w, "manifest not found or not ready")
 	log.Printf("-- pfManifestGetHandler done sucessfully")
 	return
 }
@@ -2075,25 +1742,19 @@ func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWrit
 	if params["broadcaster"] == "" {
 		errStr := fmt.Sprintf("XX broadcaster JSON parameter is missing")
 		log.Printf(errStr)
-		jsonStr := `{"error":"'broadcaster' parameter is missing"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, "'broadcaster' parameter is missing")
 		return
 	}
 	if params["contentId"] == "" {
 		errStr := fmt.Sprintf("XX contentId JSON parameter is missing")
 		log.Printf(errStr)
-		jsonStr := `{"error":"'contentId' parameter is missing"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, "'contentId' parameter is missing")
 		return
 	}
 	if params["type"] == "" {
 		errStr := fmt.Sprintf("XX type JSON parameter is missing")
 		log.Printf(errStr)
-		jsonStr := `{"error":"'type' parameter is missing"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, "'type' parameter is missing")
 		return
 	}
 
@@ -2106,9 +1767,7 @@ func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWrit
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -2117,9 +1776,7 @@ func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWrit
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s,%s): %s", query, params["contentId"], strings.ToUpper(params["broadcaster"]), err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -2141,9 +1798,7 @@ func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWrit
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot get row for query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		if params["type"] == "audio" {
@@ -2172,17 +1827,13 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	if params["contentId"] == "" {
 		errStr := fmt.Sprintf("XX contentId JSON parameter is missing")
 		log.Printf(errStr)
-		jsonStr := `{"error":"'contentId' parameter is missing"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, "'contentId' parameter is missing")
 		return
 	}
 	if params["broadcaster"] == "" {
 		errStr := fmt.Sprintf("XX broadcaster JSON parameter is missing")
 		log.Printf(errStr)
-		jsonStr := `{"error":"'broadcaster' parameter is missing"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, "'broadcaster' parameter is missing")
 		return
 	}
 
@@ -2195,9 +1846,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -2206,9 +1855,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, params["contentId"])
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 
@@ -2231,9 +1878,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -2242,9 +1887,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, params["contentId"], err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -2257,9 +1900,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot get row for query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		jsonStr += fmt.Sprintf(`{"lang":"%s","url":"%s"},`, lang, url)
@@ -2288,9 +1929,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 
@@ -2312,7 +1951,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 		}
 	}
 	if errMsg != nil {
-		w.Write([]byte(`{"error":"` + strings.Join(errMsg, ",") + `"}`))
+		sendError(w, strings.Join(errMsg, ","))
 		return
 	}
 
@@ -2325,9 +1964,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query2, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt2.Close()
@@ -2338,9 +1975,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -2351,9 +1986,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query3, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt3.Close()
@@ -2364,9 +1997,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query4, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 
@@ -2374,9 +2005,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query2, *jss.ContentId, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	for _, s := range *jss.Subtitles {
@@ -2384,18 +2013,14 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%s,%s): %s", query, *jss.ContentId, *s.Lang, *s.Url, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		err = getSubtitles(*s.Url, `/space/videos/encoded/tmp/`+path.Base(*s.Url))
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot GET url %s: %s", query, *s.Url, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		filesToMove = append(filesToMove, `/space/videos/encoded/tmp/`+path.Base(*s.Url))
@@ -2406,9 +2031,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query3, *jss.ContentId, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -2424,9 +2047,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		if acceptSubs == `yes` && (strings.Contains(profileName, `SUB`) == false) {
@@ -2438,9 +2059,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query4, broadcaster, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		reProfile := regexp.MustCompile(`^(VIDEO[0-9]+[A-Z]{3}_(AUDIO[0-9]+[A-Z]{3}_)+).*$`)
@@ -2452,9 +2071,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 			matches := reProfile.FindStringSubmatch(profileName)
@@ -2485,9 +2102,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query4, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	var filename string
@@ -2502,9 +2117,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot move file from %s to %s: %s", f, newPath, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -2518,18 +2131,14 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		_, err = stmt.Exec(*jss.ContentId, p)
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -2540,18 +2149,14 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 			_, err = stmt.Exec(*jss.ContentId, p.newProfileId)
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p.newProfileId, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 		} else {
@@ -2560,18 +2165,14 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 			_, err = stmt.Exec(*jss.ContentId, p.newProfileId)
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p.newProfileId, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 			query = "DELETE FROM assets AS a LEFT JOIN presets AS p ON a.presetId=p.presetId WHERE contentId=? AND p.profileId=?"
@@ -2579,18 +2180,14 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 			_, err = stmt.Exec(*jss.ContentId, p.oldProfileId)
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p.oldProfileId, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 			m := make(map[string]interface{})
@@ -2617,9 +2214,6 @@ func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWr
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
-		/*jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))*/
 		sendError(w, err.Error())
 		return
 	}
@@ -2645,7 +2239,7 @@ func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWr
 		}
 	}
 	if errMsg != nil {
-		w.Write([]byte(`{"error":"` + strings.Join(errMsg, ",") + `"}`))
+		sendError(w, strings.Join(errMsg, ","))
 		return
 	}
 
@@ -2659,9 +2253,7 @@ func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWr
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		defer stmt.Close()
@@ -2669,9 +2261,7 @@ func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWr
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%s,%s): %s", query, *s.Channel, *s.Type, *s.Lang, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -2693,9 +2283,6 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("pfTranscodePostHandler : Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
-		/*jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))*/
 		sendError(w, err.Error())
 		return
 	}
@@ -2709,7 +2296,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		errMsg = append(errMsg, "'broadcaster' is missing")
 	}
 	if errMsg != nil {
-		w.Write([]byte(`{"error":"` + strings.Join(errMsg, ",") + `"}`))
+		sendError(w, strings.Join(errMsg, ","))
 		return
 	}
 
@@ -2722,9 +2309,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -2733,9 +2318,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, *jt.ContentId, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -2750,9 +2333,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		if streamType == "video" && videoChannel == 0 {
@@ -2778,9 +2359,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -2788,9 +2367,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, *jt.ContentId, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -2802,9 +2379,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		reSubStr += fmt.Sprintf(`(_SUB0%s)?`, strings.ToUpper(lang))
@@ -2824,9 +2399,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -2834,9 +2407,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, *jt.Broadcaster, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -2851,9 +2422,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		log.Printf("name is %s", name)
@@ -2869,9 +2438,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if profileMatch == -1 {
 		errStr := `XX There is no profile matching the transcoding request`
 		log.Printf(errStr)
-		jsonStr := `{"error":"There is no profile matching the transcoding request"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, "There is no profile matching the transcoding request")
 		return
 	}
 
@@ -2880,9 +2447,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -2891,9 +2456,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if err != nil && err != sql.ErrNoRows {
 		errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	if currentProfileId != -1 {
@@ -2902,9 +2465,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		defer stmt.Close()
@@ -2912,9 +2473,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, *jt.Broadcaster, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 	}
@@ -2926,9 +2485,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot transcode contentId %d with profileId %d: %s", *jt.ContentId, profileMatch, err)
 		log.Printf(errStr)
-		jsonStr := fmt.Sprintf(`{"error":"Cannot transcode contentId %d with profileId %d: %s"}`, *jt.ContentId, profileMatch, err)
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, fmt.Sprintf("Cannot transcode contentId %d with profileId %d: %s", *jt.ContentId, profileMatch, err))
 		return
 	}
 	log.Printf("-- pfTranscodePostHandler done successfully")
@@ -3170,9 +2727,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -3181,9 +2736,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -3195,9 +2748,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		var re *regexp.Regexp
@@ -3206,9 +2757,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot compile regexp %s: %s", regexpStr, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		matches := re.FindAllStringSubmatch(cmdLine, -1)
@@ -3221,7 +2770,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 		}
 	}
 	if errMsg != nil {
-		w.Write([]byte(`{"error":"` + strings.Join(errMsg, ",") + `"}`))
+		sendError(w, strings.Join(errMsg, ","))
 		err = fmt.Errorf("%s", errMsg)
 		return
 	}
@@ -3231,9 +2780,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	var contentProfileId string
@@ -3248,9 +2795,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -3260,9 +2805,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	baseContentFilename := path.Base(contentFilename)
@@ -3274,9 +2817,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -3284,9 +2825,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
@@ -3305,9 +2844,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
@@ -3318,9 +2855,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt2.Close()
@@ -3331,9 +2866,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt3.Close()
@@ -3344,9 +2877,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt4.Close()
@@ -3356,9 +2887,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 	defer stmt5.Close()
@@ -3366,9 +2895,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	if err != nil {
 		errStr := fmt.Sprintf("XX Error during query execution %s with (%d,%f): %s", query, contentId, m["profileId"].(float64), err)
 		log.Printf(errStr)
-		jsonStr := `{"error":"` + err.Error() + `"}`
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(jsonStr))
+		sendError(w, err.Error())
 		return
 	}
 
@@ -3377,9 +2904,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot scan query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		if presetIdDependance != nil {
@@ -3410,9 +2935,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 		if err != nil {
 			errStr := fmt.Sprintf("XX Error during query execution %s with (%d,%d): %s", query, contentId, presetId, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		if assetIdDependance == nil {
@@ -3423,9 +2946,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 		if err != nil {
 			errStr := fmt.Sprintf("XX Error during query execution %s with %s: %s", query, m["profileId"].(float64), err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		var assetId int64
@@ -3433,9 +2954,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 		if err != nil {
 			errStr := fmt.Sprintf("XX Cannot get last insert ID with query %s: %s", query, err)
 			log.Printf(errStr)
-			jsonStr := `{"error":"` + err.Error() + `"}`
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(jsonStr))
+			sendError(w, err.Error())
 			return
 		}
 		for k, v := range profilesParameters {
@@ -3443,18 +2962,14 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%s, %d, %s): %s", query, m["profileId"].(float64), assetId, k, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 			_, err = stmt4.Exec(m["profileId"].(float64), assetId, k, v)
 			if err != nil {
 				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%s, %d, %s, %s): %s", query, m["profileId"].(float64), assetId, k, v, err)
 				log.Printf(errStr)
-				jsonStr := `{"error":"` + err.Error() + `"}`
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(jsonStr))
+				sendError(w, err.Error())
 				return
 			}
 		}
@@ -3509,5 +3024,5 @@ func sendError(w http.ResponseWriter, error string) {
 
 //TODO : NCO : later...
 /*func sendSuccess(w http.ResponseWriter) {
-	
+
 }*/

@@ -157,7 +157,7 @@ func (e *SchedulerExchangerTask) sendEncodingTasks() {
 				log.Printf("-- encoding tasks sender looping continued (currentChannel is nil)")
 				continue
 			}
-			log.Printf("-- encoding tasks sender thread looping...")
+			//log.Printf("-- encoding tasks sender thread looping...")
 			// Send encoding task to the queue
 			db := database.OpenDb()
 			query := "SELECT assetId,contentId,assetIdDependance FROM assets WHERE state='scheduled'"
@@ -312,7 +312,7 @@ func (e *SchedulerExchangerTask) sendEncodingTasks() {
 			}
 
 			db.Close()
-			log.Printf("-- encoding tasks sender thread looping done successfully")
+			//log.Printf("-- encoding tasks sender thread looping done successfully")
 		}
 	}()
 }
