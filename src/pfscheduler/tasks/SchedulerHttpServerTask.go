@@ -132,6 +132,7 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	//
 	contents := []*database.Content{}
 	//
 	db := database.OpenGormDb()
@@ -141,7 +142,7 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 	if params["id"] != "" {
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", id, err)
+			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
@@ -152,7 +153,7 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 	if params["profileId"] != "" {
 		profileId, err := strconv.Atoi(params["profileId"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert profileId value '%s' to int: %s", profileId, err)
+			errStr := fmt.Sprintf("Cannot convert profileId value '%s' to int: %s", params["profileId"], err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
@@ -319,80 +320,41 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 
 func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- contentsStreamsGetHandler...")
-	var err error
+	params := mux.Vars(r)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	params := mux.Vars(r)
-	id := -1
-	if params["id"] != "" {
-		id, err = strconv.Atoi(params["id"])
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert id %s: %s", params["id"], err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-	}
-
-	db := database.OpenDb()
+	//
+	contentsStreams := []*database.ContentsStream{}
+	//
+	db := database.OpenGormDb()
 	defer db.Close()
-
-	var query string
-	if id == -1 {
-		query = "SELECT * FROM contentsStreams"
-	} else {
-		query = "SELECT * FROM contentsStreams WHERE contentId=?"
-	}
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer stmt.Close()
-	var s database.ContentsStream
-	var rows *sql.Rows
-	if id == -1 {
-		rows, err = stmt.Query()
-	} else {
-		rows, err = stmt.Query(id)
-	}
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer rows.Close()
-	rowsNumber := 0
-	jsonAnswer := ""
-	for rows.Next() {
-		err = rows.Scan(&s.ID, &s.ContentId, &s.MapId, &s.Type, &s.Language, &s.Codec, &s.CodecInfo, &s.CodecProfile, &s.Bitrate, &s.Frequency, &s.Width, &s.Height, &s.Fps, &s.CreatedAt, &s.UpdatedAt)
+	req := db
+	//
+	if params["id"] != "" {
+		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
+			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
 		}
-		b, err := json.Marshal(s)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", s, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-		jsonAnswer += string(b) + ","
-		rowsNumber++
+		log.Printf("-- contentsStreamsGetHandler, id=%d", id)
+		req = req.Where(database.ContentsStream{ID: id})
 	}
-	if rowsNumber > 0 {
-		jsonAnswer = "[" + jsonAnswer[:len(jsonAnswer)-1] + "]"
-	} else {
-		jsonAnswer = "[ ]"
+	//
+	req.Find(&contentsStreams)
+	//
+	result, err := json.Marshal(contentsStreams)
+	if err != nil {
+		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		log.Printf(errStr)
+		sendError(w, err.Error())
+		return
 	}
-	w.Write([]byte(jsonAnswer))
+	log.Printf("-- contentsStreamsGetHandler, result=%s", result)
+	w.Write([]byte(result))
 	log.Printf("-- contentsStreamsGetHandler done successfully")
 }
 
@@ -663,155 +625,81 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 
 func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- ffmpegLogsGetHandler...")
-	var err error
+	params := mux.Vars(r)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	params := mux.Vars(r)
-	id := -1
-	if params["assetId"] != "" {
-		id, err = strconv.Atoi(params["assetId"])
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-	}
-	db := database.OpenDb()
+	//
+	ffmpegLogs := []*database.FfmpegLog{}
+	//
+	db := database.OpenGormDb()
 	defer db.Close()
-
-	var query string
-	if id == -1 {
-		query = "SELECT * FROM ffmpegLogs"
-	} else {
-		query = "SELECT * FROM ffmpegLogs WHERE assetId=?"
-	}
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer stmt.Close()
-	var fl database.FfmpegLog
-	var rows *sql.Rows
-	if id == -1 {
-		rows, err = stmt.Query()
-	} else {
-		rows, err = stmt.Query(id)
-	}
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer rows.Close()
-	rowsNumber := 0
-	jsonAnswer := ""
-	for rows.Next() {
-		err = rows.Scan(&fl.AssetId, &fl.Log)
+	req := db
+	//
+	if params["assetId"] != "" {
+		assetId, err := strconv.Atoi(params["assetId"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
+			errStr := fmt.Sprintf("Cannot convert assetId value '%s' to int: %s", params["assetId"], err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
 		}
-		b, err := json.Marshal(fl)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", fl, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-		jsonAnswer += string(b) + ","
-		rowsNumber++
+		log.Printf("-- ffmpegLogsGetHandler, assetId=%d", assetId)
+		req = req.Where(database.FfmpegLog{AssetId: assetId})
 	}
-	jsonAnswer = jsonAnswer[:len(jsonAnswer)-1]
-	if rowsNumber > 1 {
-		jsonAnswer = "[" + jsonAnswer + "]"
+	//
+	req.Find(&ffmpegLogs)
+	//
+	result, err := json.Marshal(ffmpegLogs)
+	if err != nil {
+		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		log.Printf(errStr)
+		sendError(w, err.Error())
+		return
 	}
-	w.Write([]byte(jsonAnswer))
+	log.Printf("-- ffmpegLogsGetHandler, result=%s", result)
+	w.Write([]byte(result))
 	log.Printf("-- ffmpegLogsGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- ffmpegProgressGetHandler...")
-	var err error
+	params := mux.Vars(r)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	params := mux.Vars(r)
-	assetId := -1
-	if params["assetId"] != "" {
-		assetId, err = strconv.Atoi(params["assetId"])
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert assetId value '%s' to int: %s", assetId, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-	}
-	db := database.OpenDb()
+	//
+	ffmpegProgresses := []*database.FfmpegProgress{}
+	//
+	db := database.OpenGormDb()
 	defer db.Close()
-
-	var query string
-	if assetId == -1 {
-		query = "SELECT * FROM ffmpegProgress"
-	} else {
-		query = "SELECT * FROM ffmpegProgress WHERE assetId=?"
-	}
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer stmt.Close()
-	var fp database.FfmpegProgress
-	var rows *sql.Rows
-	if assetId == -1 {
-		rows, err = stmt.Query()
-	} else {
-		rows, err = stmt.Query(assetId)
-	}
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer rows.Close()
-	rowsNumber := 0
-	jsonAnswer := ""
-	for rows.Next() {
-		err = rows.Scan(&fp.AssetId, &fp.Frame, &fp.Fps, &fp.Q, &fp.Size, &fp.Elapsed, &fp.Bitrate)
+	req := db
+	//
+	if params["assetId"] != "" {
+		assetId, err := strconv.Atoi(params["assetId"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
+			errStr := fmt.Sprintf("Cannot convert assetId value '%s' to int: %s", params["assetId"], err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
 		}
-		b, err := json.Marshal(fp)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", fp, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-		jsonAnswer += string(b) + ","
-		rowsNumber++
+		log.Printf("-- ffmpegProgressGetHandler, assetId=%d", assetId)
+		req = req.Where(database.FfmpegProgress{AssetId: assetId})
 	}
-	jsonAnswer = jsonAnswer[:len(jsonAnswer)-1]
-	if rowsNumber > 1 {
-		jsonAnswer = "[" + jsonAnswer + "]"
+	//
+	req.Find(&ffmpegProgresses)
+	//
+	result, err := json.Marshal(ffmpegProgresses)
+	if err != nil {
+		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		log.Printf(errStr)
+		sendError(w, err.Error())
+		return
 	}
-	w.Write([]byte(jsonAnswer))
+	log.Printf("-- ffmpegProgressGetHandler, result=%s", result)
+	w.Write([]byte(result))
 	log.Printf("-- ffmpegProgressGetHandler done successfully")
 }
 
@@ -958,247 +846,132 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 
 func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- encodersGetHandler...")
-	var err error
+	params := mux.Vars(r)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	params := mux.Vars(r)
-	id := -1
-	if params["id"] != "" {
-		id, err = strconv.Atoi(params["id"])
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-	}
-	db := database.OpenDb()
+	//
+	encoders := []*database.Encoder{}
+	//
+	db := database.OpenGormDb()
 	defer db.Close()
-
-	var query string
-	if id == -1 {
-		query = "SELECT * FROM encoders"
-	} else {
-		query = "SELECT * FROM encoders WHERE encoderId=?"
-	}
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer stmt.Close()
-	var e database.Encoder
-	var rows *sql.Rows
-	if id == -1 {
-		rows, err = stmt.Query()
-	} else {
-		rows, err = stmt.Query(id)
-	}
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer rows.Close()
-	rowsNumber := 0
-	jsonAnswer := ""
-	for rows.Next() {
-		err = rows.Scan(&e.ID, &e.Hostname, &e.ActiveTasks, &e.Load1, &e.UpdatedAt)
+	req := db
+	//
+	if params["id"] != "" {
+		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
+			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
 		}
-		b, err := json.Marshal(e)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", e, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-		jsonAnswer += string(b) + ","
-		rowsNumber++
+		log.Printf("-- encodersGetHandler, id=%d", id)
+		req = req.Where(database.Encoder{ID: id})
 	}
-	jsonAnswer = jsonAnswer[:len(jsonAnswer)-1]
-	if rowsNumber > 1 {
-		jsonAnswer = "[" + jsonAnswer + "]"
+	//
+	req.Find(&encoders)
+	//
+	result, err := json.Marshal(encoders)
+	if err != nil {
+		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		log.Printf(errStr)
+		sendError(w, err.Error())
+		return
 	}
-	w.Write([]byte(jsonAnswer))
-	log.Printf("-- encodersGetHandler done successfuly")
+	log.Printf("-- encodersGetHandler, result=%s", result)
+	w.Write([]byte(result))
+	log.Printf("-- encodersGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- presetsGetHandler...")
-	var err error
+	params := mux.Vars(r)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	params := mux.Vars(r)
-	id := -1
-	profileId := -1
+	//
+	presets := []*database.Preset{}
+	//
+	db := database.OpenGormDb()
+	defer db.Close()
+	req := db
+	//
 	if params["id"] != "" {
-		id, err = strconv.Atoi(params["id"])
+		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
+			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
 		}
+		log.Printf("-- presetsGetHandler, id=%d", id)
+		req = req.Where(database.Preset{ID: id})
 	}
 	if params["profileId"] != "" {
-		profileId, err = strconv.Atoi(params["profileId"])
+		profileId, err := strconv.Atoi(params["profileId"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert profileId value '%s' to int: %s", profileId, err)
+			errStr := fmt.Sprintf("Cannot convert profileId value '%s' to int: %s", params["profileId"], err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
 		}
+		log.Printf("-- presetsGetHandler, profileId=%d", profileId)
+		req = req.Where(database.Preset{ProfileId: profileId})
 	}
-	db := database.OpenDb()
-	defer db.Close()
-
-	var query string
-	if id >= 0 {
-		query = "SELECT * FROM presets WHERE presetId=?"
-	} else {
-		if profileId >= 0 {
-			query = "SELECT * FROM presets WHERE profileId=?"
-			id = profileId
-		} else {
-			query = "SELECT * FROM presets"
-		}
-	}
-	stmt, err := db.Prepare(query)
+	//
+	req.Find(&presets)
+	//
+	result, err := json.Marshal(presets)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
+		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
 		log.Printf(errStr)
 		sendError(w, err.Error())
 		return
 	}
-	defer stmt.Close()
-	var p database.Preset
-	var rows *sql.Rows
-	if id == -1 {
-		rows, err = stmt.Query()
-	} else {
-		rows, err = stmt.Query(id)
-	}
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer rows.Close()
-	rowsNumber := 0
-	jsonAnswer := ""
-	for rows.Next() {
-		err = rows.Scan(&p.ID, &p.ProfileId, &p.PresetIdDependance, &p.Name, &p.Type, &p.DoAnalyze, &p.CmdLine, &p.CreatedAt, &p.UpdatedAt)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-		b, err := json.Marshal(p)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", p, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-		jsonAnswer += string(b) + ","
-		rowsNumber++
-	}
-	jsonAnswer = jsonAnswer[:len(jsonAnswer)-1]
-	if rowsNumber > 1 {
-		jsonAnswer = "[" + jsonAnswer + "]"
-	}
-	w.Write([]byte(jsonAnswer))
+	log.Printf("-- presetsGetHandler, result=%s", result)
+	w.Write([]byte(result))
 	log.Printf("-- presetsGetHandler done successfully")
 }
 
 func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- profilesGetHandler...")
-	var err error
+	params := mux.Vars(r)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	params := mux.Vars(r)
-	id := -1
-	if params["id"] != "" {
-		id, err = strconv.Atoi(params["id"])
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-	}
-	db := database.OpenDb()
+	//
+	profiles := []*database.Profile{}
+	//
+	db := database.OpenGormDb()
 	defer db.Close()
-
-	var query string
-	if id == -1 {
-		query = "SELECT `profileId`,`name`,`broadcaster`,`acceptSubtitles`,`createdAt`,`updatedAt` FROM profiles"
-	} else {
-		query = "SELECT `profileId`,`name`,`broadcaster`,`acceptSubtitles`,`createdAt`,`updatedAt` FROM profiles WHERE profileId=?"
-	}
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer stmt.Close()
-	var p database.Profile
-	var rows *sql.Rows
-	if id == -1 {
-		rows, err = stmt.Query()
-	} else {
-		rows, err = stmt.Query(id)
-	}
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer rows.Close()
-	rowsNumber := 0
-	jsonAnswer := ""
-	for rows.Next() {
-		err = rows.Scan(&p.ID, &p.Name, &p.Broadcaster, &p.AcceptSubtitles, &p.CreatedAt, &p.UpdatedAt)
+	req := db
+	//
+	if params["id"] != "" {
+		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
+			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
 		}
-		b, err := json.Marshal(p)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", p, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-		jsonAnswer += string(b) + ","
-		rowsNumber++
+		log.Printf("-- profilesGetHandler, id=%d", id)
+		req = req.Where(database.Profile{ID: id})
 	}
-	jsonAnswer = jsonAnswer[:len(jsonAnswer)-1]
-	if rowsNumber > 1 {
-		jsonAnswer = "[" + jsonAnswer + "]"
+	//
+	req.Find(&profiles)
+	//
+	result, err := json.Marshal(profiles)
+	if err != nil {
+		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		log.Printf(errStr)
+		sendError(w, err.Error())
+		return
 	}
-	w.Write([]byte(jsonAnswer))
+	log.Printf("-- profilesGetHandler, result=%s", result)
+	w.Write([]byte(result))
 	log.Printf("-- profilesGetHandler done successfully")
 }
 
@@ -1450,81 +1223,41 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 
 func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- profilesParametersGetHandler...")
-	var err error
+	params := mux.Vars(r)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	params := mux.Vars(r)
-	id := -1
-	if params["presetParameterId"] != "" {
-		id, err = strconv.Atoi(params["presetParameterId"])
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-	}
-
-	db := database.OpenDb()
+	//
+	profilesParameters := []*database.ProfilesParameter{}
+	//
+	db := database.OpenGormDb()
 	defer db.Close()
-
-	var query string
-	if id == -1 {
-		query = "SELECT * FROM profilesParameters"
-	} else {
-		query = "SELECT * FROM profilesParameters WHERE profileParameterId=?"
-	}
-	stmt, err := db.Prepare(query)
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer stmt.Close()
-	var pp database.ProfilesParameter
-	var rows *sql.Rows
-	if id == -1 {
-		rows, err = stmt.Query()
-	} else {
-		rows, err = stmt.Query(id)
-	}
-	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
-		sendError(w, err.Error())
-		return
-	}
-	defer rows.Close()
-	rowsNumber := 0
-	jsonAnswer := ""
-	for rows.Next() {
-		err = rows.Scan(&pp.ID, &pp.ProfileId, &pp.Parameter, &pp.Value, &pp.CreatedAt, &pp.UpdatedAt)
+	req := db
+	//
+	if params["presetParameterId"] != "" {
+		presetParameterId, err := strconv.Atoi(params["presetParameterId"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
+			errStr := fmt.Sprintf("Cannot convert presetParameterId value '%s' to int: %s", params["presetParameterId"], err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
 		}
-		b, err := json.Marshal(pp)
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", pp, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}
-		jsonAnswer += string(b) + ","
-		rowsNumber++
+		log.Printf("-- profilesParametersGetHandler, id=%d", presetParameterId)
+		req = req.Where(database.ProfilesParameter{ID: presetParameterId})
 	}
-	if rowsNumber > 0 {
-		jsonAnswer = jsonAnswer[:len(jsonAnswer)-1]
+	//
+	req.Find(&profilesParameters)
+	//
+	result, err := json.Marshal(profilesParameters)
+	if err != nil {
+		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		log.Printf(errStr)
+		sendError(w, err.Error())
+		return
 	}
-	if rowsNumber > 1 {
-		jsonAnswer = "[" + jsonAnswer + "]"
-	}
-	w.Write([]byte(jsonAnswer))
+	log.Printf("-- profilesParametersGetHandler, result=%s", result)
+	w.Write([]byte(result))
 	log.Printf("-- profilesParametersGetHandler done successfully")
 }
 

@@ -6,7 +6,7 @@ type Preset struct {
 	PresetIdDependance string `gorm:"column:presetIdDependance" json:"presetIdDependance"`
 	Name               string `gorm:"column:name" json:"name"`
 	Type               string `gorm:"column:type" json:"type"`
-	DoAnalyze          bool   `gorm:"column:doAnalyze" json:"doAnalyze"`
+	DoAnalyze          string `gorm:"column:doAnalyze" json:"doAnalyze"`
 	CmdLine            string `gorm:"column:cmdLine" json:"cmdLine"`
 	CreatedAt          string `gorm:"column:createdAt" json:"createdAt"`
 	UpdatedAt          string `gorm:"column:updatedAt" json:"updatedAt"`
