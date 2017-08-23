@@ -2019,20 +2019,161 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		sendError(w, err.Error())
 		return
 	}
-
 	var errMsg []string
 	// Validate datas
-	if jt.ContentId == nil {
+	if jt.ContentId == 0 {
 		errMsg = append(errMsg, "'contentId' is missing")
 	}
-	if jt.Broadcaster == nil {
+	if jt.Broadcaster == "" {
 		errMsg = append(errMsg, "'broadcaster' is missing")
 	}
 	if errMsg != nil {
 		sendError(w, strings.Join(errMsg, ","))
 		return
 	}
+	db := database.OpenGormDb()
+	defer db.Close()
+	//DATABASE -->
+	log.Printf("-- pfTranscodePostHandler : loading content...")
+	content := database.Content{ID: jt.ContentId}
+	if db.Where(&content).First(&content).RecordNotFound() {
+		log.Printf("pfTranscodePostHandler : no content with contentId=%d", jt.ContentId)
+		sendError(w, fmt.Sprintf("no content with contentId=%d", jt.ContentId))
+		return
+	}
+	log.Printf("-- pfTranscodePostHandler : loading content done successfully")
+	log.Printf("-- pfTranscodePostHandler : loading broadacaster...")
+	broadcaster := database.Broadcaster{Name: strings.ToUpper(jt.Broadcaster)}
+	if db.Where(&broadcaster).First(&broadcaster).RecordNotFound() {
+		log.Printf("pfTranscodePostHandler : no broadcaster named=%d", jt.Broadcaster)
+		sendError(w, fmt.Sprintf("no broadcaster named=%d", jt.Broadcaster))
+		return
+	}
+	log.Printf("-- pfTranscodePostHandler : loading broadcaster done successfully")
+	log.Printf("-- pfTranscodePostHandler : loading contentsStreams...")
+	contentsStreams := []database.ContentsStream{}
+	db.Where("contentId = ? AND type IN ('audio', 'video')", content.ID).Order("type, mapId").Find(&contentsStreams)
+	likeProfile := ""
+	likeProfileSubBurned := ""
+	videoChannel := 0
+	audioChannel := 0
+	for _, contentsStream := range contentsStreams {
+		if contentsStream.Type == "video" && videoChannel == 0 {
+			likeProfile += fmt.Sprintf(`%s%d%s_`, strings.ToUpper(contentsStream.Type), videoChannel, strings.ToUpper(contentsStream.Language))
+			videoChannel++
+		} else {
+			if contentsStream.Type == "audio" && audioChannel == 0 {
+				likeProfile += fmt.Sprintf(`%s%d%s`, strings.ToUpper(contentsStream.Type), audioChannel, strings.ToUpper(contentsStream.Language))
+				audioChannel++
+			} else {
+				if contentsStream.Type == "video" {
+					likeProfile += fmt.Sprintf(`(_%s%d%s)?`, strings.ToUpper(contentsStream.Type), videoChannel, strings.ToUpper(contentsStream.Language))
+				} else {
+					if contentsStream.Type == "audio" {
+						likeProfile += fmt.Sprintf(`(_%s%d%s)?`, strings.ToUpper(contentsStream.Type), videoChannel, strings.ToUpper(contentsStream.Language))
+					}
+				}
+			}
+		}
+	}
+	log.Printf("-- pfTranscodePostHandler : loading contentsStreams done successfully")
+	log.Printf("-- pfTranscodePostHandler : loading subtitles...")
+	subtitles := []database.Subtitle{}
+	db.Where(&database.Subtitle{ContentId: content.ID}).Find(&subtitles)
+	reSubStr := ""
+	subsFound := false
+	for _, subtitle := range subtitles {
+		reSubStr += fmt.Sprintf(`(_SUB0%s)?`, strings.ToUpper(subtitle.Lang))
+		subsFound = true
+	}
+	if subsFound == true {
+		if likeProfile != "" {
+			likeProfileSubBurned = `^` + likeProfile + reSubStr + `$`
+		}
+	}
+	log.Printf("-- pfTranscodePostHandler : loading subtitles done successfully")
+	likeProfile = `^` + likeProfile + `$`
+	log.Printf("-- pfTranscodePostHandler : likeProfile is %s", likeProfile)
+	log.Printf("-- pfTranscodePostHandler : likeProfileSubBurned is %s", likeProfileSubBurned)
+	log.Printf("-- pfTranscodePostHandler : loading profiles...")
+	profiles := []database.Profile{}
+	db.Where(&database.Profile{Broadcaster: broadcaster.Name}).Find(&profiles)
+	profileMatch := -1
+	profileNameSelected := ""
+	reProfile := regexp.MustCompile(likeProfile)
+	reProfileSubBurned := regexp.MustCompile(likeProfileSubBurned)
+	for _, profile := range profiles {
+		log.Printf("-- pfTranscodePostHandler : profiles looping : current name is %s", profile.Name)
+		if reProfile.Match([]byte(profile.Name)) == true || (likeProfileSubBurned != "" && reProfileSubBurned.Match([]byte(profile.Name)) == true) {
+			log.Printf("-- pfTranscodePostHandler : profiles looping : profile %s (%d) matched", profile.Name, profile.ID)
+			if len(profile.Name) > len(profileNameSelected) {
+				//TODO : NCO : should keep a current profile instead
+				profileNameSelected = profile.Name
+				profileMatch = profile.ID
+			}
+		}
+	}
+	if profileMatch == -1 {
+		log.Printf("pfTranscodePostHandler : There is no profile matching the transcoding request")
+		sendError(w, "There is no profile matching the transcoding request")
+		return
+	}
+	log.Printf("-- pfTranscodePostHandler : loading profiles done successfully")
+	//Search for a profile linked to that content and broacaster
+	log.Printf("-- pfTranscodePostHandler : existing contentsProfile searching...")
+	contentsProfile := database.ContentsProfile{}
+	if db.Joins("JOIN profiles ON contentsProfiles.profileId = profiles.profileId").
+		Where("contentsProfiles.contentId = ? AND profiles.broadcaster = ?", content.ID, broadcaster.Name).
+		First(&contentsProfile).Error == nil {
+		log.Printf("-- pfTranscodePostHandler : existing contentsProfile FOUND")
+		//Found => Remove It
+		db.Delete(database.ContentsProfile{}, "contentId = ? AND profileId = ?", content.ID, contentsProfile.ProfileId)
+		log.Printf("-- pfTranscodePostHandler : existing contentsProfile removed")
+	} else {
+		log.Printf("-- pfTranscodePostHandler : existing contentsProfile NOT FOUND")
+	}
+	//<-- DATABASE
+	//TODO : to be continued
+	log.Printf("-- pfTranscodePostHandler : profileMatch is %d", profileMatch)
+	m := map[string]interface{}{}
+	m["profileId"] = float64(profileMatch)
+	err = transcode(w, r, m, content.ID)
+	if err != nil {
+		errStr := fmt.Sprintf("pfTranscodePostHandler : Cannot transcode contentId %d with profileId %d: %s", content.ID, profileMatch, err)
+		log.Printf(errStr)
+		sendError(w, fmt.Sprintf("Cannot transcode contentId %d with profileId %d: %s", content.ID, profileMatch, err))
+		return
+	}
+	log.Printf("-- pfTranscodePostHandler done successfully")
+	return
+}
 
+func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- pfTranscodePostHandler...")
+	body, _ := ioutil.ReadAll(r.Body)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
+	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	jt, err := newJsonTranscodeFromBytes(body)
+	if err != nil {
+		errStr := fmt.Sprintf("pfTranscodePostHandler : Cannot decode JSON %s: %s", body, err)
+		log.Printf(errStr)
+		sendError(w, err.Error())
+		return
+	}
+	var errMsg []string
+	// Validate datas
+	if jt.ContentId == 0 {
+		errMsg = append(errMsg, "'contentId' is missing")
+	}
+	if jt.Broadcaster == "" {
+		errMsg = append(errMsg, "'broadcaster' is missing")
+	}
+	if errMsg != nil {
+		sendError(w, strings.Join(errMsg, ","))
+		return
+	}
 	db := database.OpenDb()
 	defer db.Close()
 
@@ -2047,9 +2188,9 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	}
 	defer stmt.Close()
 	var rows *sql.Rows
-	rows, err = stmt.Query(*jt.ContentId)
+	rows, err = stmt.Query(jt.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, *jt.ContentId, err)
+		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, jt.ContentId, err)
 		log.Printf(errStr)
 		sendError(w, err.Error())
 		return
@@ -2096,9 +2237,9 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		return
 	}
 	defer stmt.Close()
-	rows, err = stmt.Query(*jt.ContentId)
+	rows, err = stmt.Query(jt.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, *jt.ContentId, err)
+		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, jt.ContentId, err)
 		log.Printf(errStr)
 		sendError(w, err.Error())
 		return
@@ -2136,9 +2277,9 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		return
 	}
 	defer stmt.Close()
-	rows, err = stmt.Query(strings.ToUpper(*jt.Broadcaster))
+	rows, err = stmt.Query(strings.ToUpper(jt.Broadcaster))
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, *jt.Broadcaster, err)
+		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, jt.Broadcaster, err)
 		log.Printf(errStr)
 		sendError(w, err.Error())
 		return
@@ -2185,7 +2326,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	}
 	defer stmt.Close()
 	currentProfileId := -1
-	err = stmt.QueryRow(*jt.ContentId, *jt.Broadcaster).Scan(&currentProfileId)
+	err = stmt.QueryRow(jt.ContentId, jt.Broadcaster).Scan(&currentProfileId)
 	if err != nil && err != sql.ErrNoRows {
 		errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
 		log.Printf(errStr)
@@ -2202,9 +2343,9 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 			return
 		}
 		defer stmt.Close()
-		_, err = stmt.Exec(*jt.ContentId, currentProfileId)
+		_, err = stmt.Exec(jt.ContentId, currentProfileId)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, *jt.Broadcaster, err)
+			errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, jt.Broadcaster, err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
@@ -2214,11 +2355,11 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	log.Printf("profileMatch is %d", profileMatch)
 	m := map[string]interface{}{}
 	m["profileId"] = float64(profileMatch)
-	err = transcode(w, r, m, *jt.ContentId)
+	err = transcode(w, r, m, jt.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot transcode contentId %d with profileId %d: %s", *jt.ContentId, profileMatch, err)
+		errStr := fmt.Sprintf("XX Cannot transcode contentId %d with profileId %d: %s", jt.ContentId, profileMatch, err)
 		log.Printf(errStr)
-		sendError(w, fmt.Sprintf("Cannot transcode contentId %d with profileId %d: %s", *jt.ContentId, profileMatch, err))
+		sendError(w, fmt.Sprintf("Cannot transcode contentId %d with profileId %d: %s", jt.ContentId, profileMatch, err))
 		return
 	}
 	log.Printf("-- pfTranscodePostHandler done successfully")
@@ -2399,22 +2540,14 @@ func packageContents(contentUuids []ContentsUuid) (errSave error) {
 
 func uuidToContentId(uuid string) (contentId int, err error) {
 	log.Printf("-- uuidToContentId...")
-	db := database.OpenDb()
+	db := database.OpenGormDb()
 	defer db.Close()
-
-	query := "SELECT contentId FROM contents WHERE uuid=?"
-	var stmt *sql.Stmt
-	stmt, err = db.Prepare(query)
-	if err != nil {
-		log.Printf("XX Cannot prepare query %s: %s", query, err)
+	content := database.Content{Uuid: uuid}
+	if db.Where(&content).First(&content).RecordNotFound() {
+		err = errors.New("RecordNotFound")
 		return
 	}
-	defer stmt.Close()
-	err = stmt.QueryRow(uuid).Scan(&contentId)
-	if err != nil {
-		log.Printf("XX Cannot query row %s with query %s: %s", uuid, query, err)
-		return
-	}
+	contentId = content.ID
 	log.Printf("-- uuidToContentId done successfully")
 	return
 }
@@ -2662,7 +2795,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 		if strings.Contains(outputFilename, `%SOURCE%`) {
 			outputFilename = contentFilename
 		}
-		log.Printf("outputFilename is %s", outputFilename)
+		log.Printf("-- transcode : outputFilename is %s", outputFilename)
 		var result sql.Result
 		_, err = stmt.Exec(contentId, presetId)
 		if err != nil {
@@ -2715,7 +2848,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 
 	jsonAnswer := `{"assetsId":[`
 	for _, a := range assetIds {
-		log.Printf("assetId is: %#v", a)
+		log.Printf("-- transcode : assetId is: %#v", a)
 		jsonAnswer += strconv.FormatInt(a, 10) + `,`
 	}
 	jsonAnswer = jsonAnswer[:len(jsonAnswer)-1] + `]}`
@@ -2727,22 +2860,14 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 
 func md5HashToContentId(md5Hash string) (contentId int, err error) {
 	log.Printf("-- md5HashToContentId...")
-	db := database.OpenDb()
+	db := database.OpenGormDb()
 	defer db.Close()
-
-	query := "SELECT contentId FROM contents WHERE md5Hash=?"
-	var stmt *sql.Stmt
-	stmt, err = db.Prepare(query)
-	if err != nil {
-		log.Printf("XX Cannot prepare query %s: %s", query, err)
+	content := database.Content{Md5Hash: md5Hash}
+	if db.Where(&content).First(&content).RecordNotFound() {
+		err = errors.New("RecordNotFound")
 		return
 	}
-	defer stmt.Close()
-	err = stmt.QueryRow(md5Hash).Scan(&contentId)
-	if err != nil {
-		log.Printf("XX Cannot query row %s with query %s: %s", md5Hash, query, err)
-		return
-	}
+	contentId = content.ID
 	log.Printf("-- md5HashToContentId done successfully")
 	return
 }
