@@ -5,8 +5,9 @@ import (
 )
 
 type JsonTranscode struct {
-	ContentId   int    `json:"contentId"`
-	Broadcaster string `json:"broadcaster"`
+	Uuid      string `json:"uuid"`
+	Md5Hash   string `json:"md5Hash"`
+	ProfileId int    `json:"profileId"`
 }
 
 func newJsonTranscodeFromBytes(data []byte) (jsonTranscode JsonTranscode, err error) {

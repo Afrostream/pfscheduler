@@ -33,6 +33,8 @@ type SchedulerHttpServerTask struct {
 	/* 'instance' variables */
 	router      *mux.Router
 	initialized bool
+	/* For test purpose only **/
+	transcodingVersion int
 }
 
 func NewSchedulerHttpServerTask() SchedulerHttpServerTask {
@@ -41,6 +43,10 @@ func NewSchedulerHttpServerTask() SchedulerHttpServerTask {
 
 func (h *SchedulerHttpServerTask) Init() bool {
 	log.Printf("-- SchedulerHttpServerTask init starting...")
+	if os.Getenv("TRANSCODING_VERSION") != "" {
+		h.transcodingVersion, _ = strconv.Atoi(os.Getenv("TRANSCODING_VERSION"))
+	}
+	log.Printf("-- SchedulerHttpServerTask init : TRANSCODING_VERSION=%d", h.transcodingVersion)
 	//
 	h.router = mux.NewRouter()
 	h.router.HandleFunc("/{a:.*}", h.optionsGetHandler).Methods("OPTIONS")
@@ -143,7 +149,7 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
 			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
-			log.Printf(errStr)
+			log.Printf("contentsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -154,7 +160,7 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 		profileId, err := strconv.Atoi(params["profileId"])
 		if err != nil {
 			errStr := fmt.Sprintf("Cannot convert profileId value '%s' to int: %s", params["profileId"], err)
-			log.Printf(errStr)
+			log.Printf("contentsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -192,7 +198,7 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 	result, err := json.Marshal(contents)
 	if err != nil {
 		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
-		log.Printf(errStr)
+		log.Printf("contentsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -212,7 +218,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	err := json.Unmarshal(body, &jcc)
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
-		log.Printf(errStr)
+		log.Printf("contentsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -336,7 +342,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
 			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
-			log.Printf(errStr)
+			log.Printf("contentsStreamsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -349,7 +355,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 	result, err := json.Marshal(contentsStreams)
 	if err != nil {
 		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
-		log.Printf(errStr)
+		log.Printf("contentsStreamsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -641,7 +647,7 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 		assetId, err := strconv.Atoi(params["assetId"])
 		if err != nil {
 			errStr := fmt.Sprintf("Cannot convert assetId value '%s' to int: %s", params["assetId"], err)
-			log.Printf(errStr)
+			log.Printf("ffmpegLogsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -681,7 +687,7 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 		assetId, err := strconv.Atoi(params["assetId"])
 		if err != nil {
 			errStr := fmt.Sprintf("Cannot convert assetId value '%s' to int: %s", params["assetId"], err)
-			log.Printf(errStr)
+			log.Printf("ffmpegProgressGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -694,7 +700,7 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 	result, err := json.Marshal(ffmpegProgresses)
 	if err != nil {
 		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
-		log.Printf(errStr)
+		log.Printf("ffmpegProgressGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -862,7 +868,7 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
 			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
-			log.Printf(errStr)
+			log.Printf("encodersGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -875,7 +881,7 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 	result, err := json.Marshal(encoders)
 	if err != nil {
 		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
-		log.Printf(errStr)
+		log.Printf("encodersGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -902,7 +908,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
 			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
-			log.Printf(errStr)
+			log.Printf("presetsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -913,7 +919,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 		profileId, err := strconv.Atoi(params["profileId"])
 		if err != nil {
 			errStr := fmt.Sprintf("Cannot convert profileId value '%s' to int: %s", params["profileId"], err)
-			log.Printf(errStr)
+			log.Printf("presetsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -926,7 +932,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 	result, err := json.Marshal(presets)
 	if err != nil {
 		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
-		log.Printf(errStr)
+		log.Printf("presetsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -953,7 +959,7 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
 			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
-			log.Printf(errStr)
+			log.Printf("profilesGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -966,7 +972,7 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 	result, err := json.Marshal(profiles)
 	if err != nil {
 		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
-		log.Printf(errStr)
+		log.Printf("profilesGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1332,49 +1338,56 @@ func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r 
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	params := mux.Vars(r)
+	/** TODO : NC : remove only when understood usage when loading presets in transcode method ... **/
 	m := map[string]interface{}{}
 	err := json.Unmarshal(body, &m)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
+		errStr := fmt.Sprintf("transcodePostHandler : Cannot decode JSON %s: %s", body, err)
 		log.Printf(errStr)
 		sendError(w, err.Error())
 		return
 	}
-	var errMsg []string
-	// Validate datas
-	if m["profileId"] == nil {
-		errMsg = append(errMsg, "'profileId' is missing")
-	}
-	if errMsg != nil {
-		sendError(w, strings.Join(errMsg, ","))
+	/************************************************************************************************/
+	jt, err := newJsonTranscodeFromBytes(body)
+	if err != nil {
+		errStr := fmt.Sprintf("transcodePostHandler : Cannot decode JSON %s: %s", body, err)
+		log.Printf(errStr)
+		sendError(w, err.Error())
 		return
 	}
-
+	// Validate datas
+	if jt.ProfileId == 0 {
+		errStr := fmt.Sprintf("transcodePostHandler : 'profileId' is missing")
+		log.Printf(errStr)
+		sendError(w, "'profileId' is missing")
+		return
+	}
 	var contentId int
-	if m["uuid"] != nil && m["uuid"].(string) != "" {
-		contentId, err = uuidToContentId(m["uuid"].(string))
+	if jt.Uuid != "" {
+		contentId, err = uuidToContentId(jt.Uuid)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot get contenId from uuid %s: %s", params["uuid"], err)
+			errStr := fmt.Sprintf("XX Cannot get contenId from uuid %s: %s", jt.Uuid, err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
 		}
 	}
-	if m["md5Hash"] != nil && m["md5Hash"].(string) != "" {
-		contentId, err = md5HashToContentId(m["md5Hash"].(string))
+	if jt.Md5Hash != "" {
+		contentId, err = md5HashToContentId(jt.Md5Hash)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot get contenId from md5Hash %s: %s", m["md5Hash"].(string), err)
+			errStr := fmt.Sprintf("XX Cannot get contenId from md5Hash %s: %s", jt.Md5Hash, err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
 		}
 	}
-
-	err = transcode(w, r, m, contentId)
-
-	if err == nil {
+	if contentId == 0 {
+		errStr := fmt.Sprintf("transcodePostHandler : no content found because 'uuid' or 'md5Hash' is missing")
+		log.Printf(errStr)
+		sendError(w, "no content found because 'uuid' or 'md5Hash' is missing")
+		return
 	}
+	err = h.transcode(w, r, jt, m, contentId)
 	log.Printf("-- transcodePostHandler done successfully")
 }
 
@@ -1923,9 +1936,9 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 				sendError(w, err.Error())
 				return
 			}
+			jt := JsonTranscode{ProfileId: p.newProfileId}
 			m := make(map[string]interface{})
-			m["profileId"] = p.newProfileId
-			transcode(w, r, m, *jss.ContentId)
+			h.transcode(w, r, jt, m, *jss.ContentId)
 		}
 	}
 
@@ -2006,47 +2019,55 @@ func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWr
 }
 
 func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("-- pfTranscodePostHandler...")
+	if h.transcodingVersion == 1 {
+		h.pfTranscodePostHandler1(w, r)
+	} else {
+		h.pfTranscodePostHandler0(w, r)
+	}
+}
+
+func (h *SchedulerHttpServerTask) pfTranscodePostHandler1(w http.ResponseWriter, r *http.Request) {
+	log.Printf("-- pfTranscodePostHandler v1...")
 	body, _ := ioutil.ReadAll(r.Body)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	jt, err := newJsonTranscodeFromBytes(body)
+	jpft, err := newJsonPfTranscodeFromBytes(body)
 	if err != nil {
-		errStr := fmt.Sprintf("pfTranscodePostHandler : Cannot decode JSON %s: %s", body, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("Cannot decode JSON %s: %s", body, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	var errMsg []string
 	// Validate datas
-	if jt.ContentId == 0 {
+	if jpft.ContentId == 0 {
 		errMsg = append(errMsg, "'contentId' is missing")
 	}
-	if jt.Broadcaster == "" {
+	if jpft.Broadcaster == "" {
 		errMsg = append(errMsg, "'broadcaster' is missing")
 	}
 	if errMsg != nil {
 		sendError(w, strings.Join(errMsg, ","))
 		return
 	}
+	//DATABASE -->
 	db := database.OpenGormDb()
 	defer db.Close()
-	//DATABASE -->
 	log.Printf("-- pfTranscodePostHandler : loading content...")
-	content := database.Content{ID: jt.ContentId}
+	content := database.Content{ID: jpft.ContentId}
 	if db.Where(&content).First(&content).RecordNotFound() {
-		log.Printf("pfTranscodePostHandler : no content with contentId=%d", jt.ContentId)
-		sendError(w, fmt.Sprintf("no content with contentId=%d", jt.ContentId))
+		log.Printf("pfTranscodePostHandler : no content with contentId=%d", jpft.ContentId)
+		sendError(w, fmt.Sprintf("no content with contentId=%d", jpft.ContentId))
 		return
 	}
 	log.Printf("-- pfTranscodePostHandler : loading content done successfully")
 	log.Printf("-- pfTranscodePostHandler : loading broadacaster...")
-	broadcaster := database.Broadcaster{Name: strings.ToUpper(jt.Broadcaster)}
+	broadcaster := database.Broadcaster{Name: strings.ToUpper(jpft.Broadcaster)}
 	if db.Where(&broadcaster).First(&broadcaster).RecordNotFound() {
-		log.Printf("pfTranscodePostHandler : no broadcaster named=%d", jt.Broadcaster)
-		sendError(w, fmt.Sprintf("no broadcaster named=%d", jt.Broadcaster))
+		log.Printf("pfTranscodePostHandler : no broadcaster named=%d", jpft.Broadcaster)
+		sendError(w, fmt.Sprintf("no broadcaster named=%d", jpft.Broadcaster))
 		return
 	}
 	log.Printf("-- pfTranscodePostHandler : loading broadcaster done successfully")
@@ -2098,7 +2119,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	log.Printf("-- pfTranscodePostHandler : loading profiles...")
 	profiles := []database.Profile{}
 	db.Where(&database.Profile{Broadcaster: broadcaster.Name}).Find(&profiles)
-	profileMatch := -1
+	var profileMatch int = -1
 	profileNameSelected := ""
 	reProfile := regexp.MustCompile(likeProfile)
 	reProfileSubBurned := regexp.MustCompile(likeProfileSubBurned)
@@ -2122,6 +2143,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 	//Search for a profile linked to that content and broacaster
 	log.Printf("-- pfTranscodePostHandler : existing contentsProfile searching...")
 	contentsProfile := database.ContentsProfile{}
+	//NC : is LEFT JOIN needed ? See old code
 	if db.Joins("JOIN profiles ON contentsProfiles.profileId = profiles.profileId").
 		Where("contentsProfiles.contentId = ? AND profiles.broadcaster = ?", content.ID, broadcaster.Name).
 		First(&contentsProfile).Error == nil {
@@ -2133,18 +2155,17 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler(w http.ResponseWriter, 
 		log.Printf("-- pfTranscodePostHandler : existing contentsProfile NOT FOUND")
 	}
 	//<-- DATABASE
-	//TODO : to be continued
 	log.Printf("-- pfTranscodePostHandler : profileMatch is %d", profileMatch)
-	m := map[string]interface{}{}
-	m["profileId"] = float64(profileMatch)
-	err = transcode(w, r, m, content.ID)
+	jt := JsonTranscode{ProfileId: profileMatch}
+	m := make(map[string]interface{})
+	err = h.transcode(w, r, jt, m, content.ID)
 	if err != nil {
-		errStr := fmt.Sprintf("pfTranscodePostHandler : Cannot transcode contentId %d with profileId %d: %s", content.ID, profileMatch, err)
+		errStr := fmt.Sprintf("pfTranscodePostHandler : Cannot transcode contentId %d with profileId %d, error=%s", content.ID, profileMatch, err)
 		log.Printf(errStr)
-		sendError(w, fmt.Sprintf("Cannot transcode contentId %d with profileId %d: %s", content.ID, profileMatch, err))
+		sendError(w, fmt.Sprintf("Cannot transcode contentId %d with profileId %d, error=%s", content.ID, profileMatch, err))
 		return
 	}
-	log.Printf("-- pfTranscodePostHandler done successfully")
+	log.Printf("-- pfTranscodePostHandler v1 done successfully")
 	return
 }
 
@@ -2155,19 +2176,19 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	jt, err := newJsonTranscodeFromBytes(body)
+	jpft, err := newJsonPfTranscodeFromBytes(body)
 	if err != nil {
-		errStr := fmt.Sprintf("pfTranscodePostHandler : Cannot decode JSON %s: %s", body, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("Cannot decode JSON %s: %s", body, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	var errMsg []string
 	// Validate datas
-	if jt.ContentId == 0 {
+	if jpft.ContentId == 0 {
 		errMsg = append(errMsg, "'contentId' is missing")
 	}
-	if jt.Broadcaster == "" {
+	if jpft.Broadcaster == "" {
 		errMsg = append(errMsg, "'broadcaster' is missing")
 	}
 	if errMsg != nil {
@@ -2188,9 +2209,9 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	}
 	defer stmt.Close()
 	var rows *sql.Rows
-	rows, err = stmt.Query(jt.ContentId)
+	rows, err = stmt.Query(jpft.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, jt.ContentId, err)
+		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, jpft.ContentId, err)
 		log.Printf(errStr)
 		sendError(w, err.Error())
 		return
@@ -2237,9 +2258,9 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 		return
 	}
 	defer stmt.Close()
-	rows, err = stmt.Query(jt.ContentId)
+	rows, err = stmt.Query(jpft.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, jt.ContentId, err)
+		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, jpft.ContentId, err)
 		log.Printf(errStr)
 		sendError(w, err.Error())
 		return
@@ -2277,15 +2298,15 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 		return
 	}
 	defer stmt.Close()
-	rows, err = stmt.Query(strings.ToUpper(jt.Broadcaster))
+	rows, err = stmt.Query(strings.ToUpper(jpft.Broadcaster))
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, jt.Broadcaster, err)
+		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, jpft.Broadcaster, err)
 		log.Printf(errStr)
 		sendError(w, err.Error())
 		return
 	}
 	defer rows.Close()
-	profileMatch := -1
+	var profileMatch int = -1
 	profileNameSelected := ``
 	reProfile := regexp.MustCompile(likeProfile)
 	reProfileSubBurned := regexp.MustCompile(likeProfileSubBurned)
@@ -2326,7 +2347,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	}
 	defer stmt.Close()
 	currentProfileId := -1
-	err = stmt.QueryRow(jt.ContentId, jt.Broadcaster).Scan(&currentProfileId)
+	err = stmt.QueryRow(jpft.ContentId, jpft.Broadcaster).Scan(&currentProfileId)
 	if err != nil && err != sql.ErrNoRows {
 		errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
 		log.Printf(errStr)
@@ -2343,9 +2364,9 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 			return
 		}
 		defer stmt.Close()
-		_, err = stmt.Exec(jt.ContentId, currentProfileId)
+		_, err = stmt.Exec(jpft.ContentId, currentProfileId)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, jt.Broadcaster, err)
+			errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, jpft.Broadcaster, err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
@@ -2353,13 +2374,13 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	}
 
 	log.Printf("profileMatch is %d", profileMatch)
-	m := map[string]interface{}{}
-	m["profileId"] = float64(profileMatch)
-	err = transcode(w, r, m, jt.ContentId)
+	jt := JsonTranscode{ProfileId: profileMatch}
+	m := make(map[string]interface{})
+	err = h.transcode(w, r, jt, m, jpft.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot transcode contentId %d with profileId %d: %s", jt.ContentId, profileMatch, err)
+		errStr := fmt.Sprintf("XX Cannot transcode contentId %d with profileId %d: %s", jpft.ContentId, profileMatch, err)
 		log.Printf(errStr)
-		sendError(w, fmt.Sprintf("Cannot transcode contentId %d with profileId %d: %s", jt.ContentId, profileMatch, err))
+		sendError(w, fmt.Sprintf("Cannot transcode contentId %d with profileId %d: %s", jpft.ContentId, profileMatch, err))
 		return
 	}
 	log.Printf("-- pfTranscodePostHandler done successfully")
@@ -2582,7 +2603,178 @@ func getSubtitles(url string, dest string) (err error) {
 	return
 }
 
-func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{}, contentId int) (err error) {
+func (h *SchedulerHttpServerTask) transcode(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[string]interface{}, contentId int) (err error) {
+	if h.transcodingVersion == 1 {
+		return transcode1(w, r, jt, m, contentId)
+	} else {
+		return transcode0(w, r, jt, m, contentId)
+	}
+}
+
+func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[string]interface{}, contentId int) (err error) {
+	log.Printf("-- transcode v1...")
+	//DATA -->
+	if jt.ProfileId == 0 {
+		errStr := fmt.Sprintf("transcode : profileId is missing")
+		log.Printf(errStr)
+		err = errors.New("profileId is missing")
+		sendError(w, err.Error())
+		return
+	}
+	//<-- DATA
+	//DATABASE -->
+	db := database.OpenGormDb()
+	defer db.Close()
+	//Loading content
+	content := database.Content{ID: contentId}
+	if db.Where(&content).First(&content).RecordNotFound() {
+		log.Printf("transcode : no content with contentId=%d", contentId)
+		sendError(w, fmt.Sprintf("no content with contentId=%d", contentId))
+		return
+	}
+	//Loading Profile
+	profile := database.Profile{ID: jt.ProfileId}
+	if db.Where(&profile).First(&profile).RecordNotFound() {
+		log.Printf("transcode : no profile with profileId=%d", jt.ProfileId)
+		sendError(w, fmt.Sprintf("no content with profileId=%d", jt.ProfileId))
+		return
+	}
+	//Loading presets
+	presets := []database.Preset{}
+	db.Where(&database.Preset{ProfileId: jt.ProfileId}).Order("presetIdDependance").Find(&presets)
+	var errMsg []string
+	profilesParameters := map[string]string{}
+	for _, preset := range presets {
+		log.Printf("-- transcode : presets looping...")
+		var re *regexp.Regexp
+		regexpStr := "%([a-z]+[a-zA-Z]*)%"
+		re, err = regexp.Compile(regexpStr)
+		if err != nil {
+			errStr := fmt.Sprintf("transcode : Cannot compile regexp %s: %s", regexpStr, err)
+			log.Printf(errStr)
+			sendError(w, err.Error())
+			return
+		}
+		matches := re.FindAllStringSubmatch(preset.CmdLine, -1)
+		for _, v := range matches {
+			if m[v[1]] == nil || m[v[1]].(string) == "" {
+				errMsg = append(errMsg, "'"+v[1]+"' is missing")
+			} else {
+				profilesParameters[v[1]] = m[v[1]].(string)
+				log.Printf("-- transcode : presets looping : profilesParameters %s=%s", v[1], m[v[1]].(string))
+			}
+		}
+		log.Printf("-- transcode : presets looping")
+	}
+	if errMsg != nil {
+		errStr := fmt.Sprintf("failed to load profilesParameters, errors=%s", strings.Join(errMsg, ","))
+		log.Printf("transcode : " + errStr)
+		err = errors.New(errStr)
+		sendError(w, err.Error())
+		return
+	}
+	//Loading %_USP% Profile
+	USPProfile := database.Profile{}
+	db.Joins("contentsProfiles ON contentsProfiles.profileId = profiles.profileId").
+	Where("contents.contentId = ? AND profiles.name LIKE ?", content.ID, "%_USP%").
+	First(&USPProfile)
+	//
+	baseContentFilename := path.Base(content.Filename)
+	extension := filepath.Ext(baseContentFilename)
+	contentFilenameBase := baseContentFilename[0 : len(baseContentFilename)-len(extension)]
+	//
+	var assetIdDependance *string = nil
+	presetToAssetIdMap := make(map[int]*int)
+	//
+	for _, preset := range presets {
+		outputFilename := encodedBasePath + "/origin/vod/" + contentFilenameBase + "/" + content.Uuid + "_" + preset.Name
+		if preset.PresetIdDependance != "" {
+			assetIdDependance = new(string)
+			presetIdsDependance := strings.Split(preset.PresetIdDependance, `,`)
+			for _, p := range presetIdsDependance {
+				presetIdDependanceAsInt, err := strconv.Atoi(p)
+				if err != nil {
+					//TODO : ERROR
+				}
+				if presetToAssetIdMap[presetIdDependanceAsInt] != nil {
+					*assetIdDependance += strconv.Itoa(*presetToAssetIdMap[presetIdDependanceAsInt]) + `,`
+				}
+			}
+			*assetIdDependance = (*assetIdDependance)[:len(*assetIdDependance)-1]
+		}
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
+		rStr := r.Intn(999)
+		random := fmt.Sprintf("%d", rStr)
+		outputFilename = strings.Replace(outputFilename, `%RANDOM%`, random, -1)
+		outputFilename = strings.Replace(outputFilename, `%CONTENTID%`, strconv.Itoa(content.ID), -1)
+		outputFilename = strings.Replace(outputFilename, `%CONTENTEXT%`, path.Ext(content.Filename), -1)
+		outputFilename = strings.Replace(outputFilename, `%CONTENTPROFILEID%`, strconv.Itoa(USPProfile.ID), -1)
+		if strings.Contains(outputFilename, `%SOURCE%`) {
+			outputFilename = content.Filename
+		}
+		log.Printf("-- transcode : outputFilename is %s", outputFilename)
+		//TODO : NCO : should be in a transaction
+		//--> DATABASE
+		//query = "DELETE FROM assets WHERE contentId=? AND presetId=?"
+		/*if assetIdDependance == nil {
+			result, err = stmt2.Exec(contentId, presetId, nil, outputFilename, doAnalyze)
+		} else {
+			result, err = stmt2.Exec(contentId, presetId, *assetIdDependance, outputFilename, doAnalyze)
+		}*/
+		//query = "INSERT INTO assets (`contentId`,`presetId`,`assetIdDependance`,`filename`,`doAnalyze`,`createdAt`) VALUES (?,?,?,?,?,NULL)"
+		//<-- DATABASE
+		/*var assetId int64
+		assetId, err = result.LastInsertId()
+		if err != nil {
+			errStr := fmt.Sprintf("XX Cannot get last insert ID with query %s: %s", query, err)
+			log.Printf(errStr)
+			sendError(w, err.Error())
+			return
+		}*/
+		for k, v := range profilesParameters {
+			log.Printf("k=%s, v=%s", k, v)
+			//query = "DELETE FROM profilesParameters WHERE profileId=? AND assetId=? AND parameter=?"
+			/*
+			_, err = stmt3.Exec(jt.ProfileId, assetId, k)
+			if err != nil {
+				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%d, %d, %s): %s", query, jt.ProfileId, assetId, k, err)
+				log.Printf(errStr)
+				sendError(w, err.Error())
+				return
+			}
+			*/
+			//query = "INSERT INTO profilesParameters (`profileId`,`assetId`,`parameter`,`value`,`createdAt`) VALUES (?,?,?,?,NOW())"
+			/*
+			_, err = stmt4.Exec(jt.ProfileId, assetId, k, v)
+			if err != nil {
+				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%d, %d, %s, %s): %s", query, jt.ProfileId, assetId, k, v, err)
+				log.Printf(errStr)
+				sendError(w, err.Error())
+				return
+			}*/
+		}
+		/*assetIds = append(assetIds, assetId)
+		v := new(int)
+		*v = int(assetId)
+		presetToAssetIdMap[preset.ID] = v*/
+	}
+	//<-- DATABASE
+	//TODO : to be continued
+	/*database.DbSetContentState(db, contentId, "scheduled")
+
+	jsonAnswer := `{"assetsId":[`
+	for _, a := range assetIds {
+		log.Printf("-- transcode : assetId is: %#v", a)
+		jsonAnswer += strconv.FormatInt(a, 10) + `,`
+	}
+	jsonAnswer = jsonAnswer[:len(jsonAnswer)-1] + `]}`
+
+	w.Write([]byte(jsonAnswer))*/
+	log.Printf("-- transcode v1 done successfully")
+	return
+}
+
+func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[string]interface{}, contentId int) (err error) {
 	log.Printf("-- transcode...")
 	err = nil
 	db := database.OpenDb()
@@ -2598,7 +2790,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 	}
 	defer stmt.Close()
 	var rows *sql.Rows
-	rows, err = stmt.Query(m["profileId"].(float64))
+	rows, err = stmt.Query(jt.ProfileId)
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query %s: %s", query, err)
 		log.Printf(errStr)
@@ -2632,6 +2824,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 				errMsg = append(errMsg, "'"+v[1]+"' is missing")
 			} else {
 				profilesParameters[v[1]] = m[v[1]].(string)
+				log.Printf("-- transcode : presets looping : profilesParameters %s=%s", v[1], m[v[1]].(string))
 			}
 		}
 	}
@@ -2687,7 +2880,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 		return
 	}
 	defer stmt.Close()
-	rows, err = stmt.Query(m["profileId"].(float64))
+	rows, err = stmt.Query(jt.ProfileId)
 	if err != nil {
 		errStr := fmt.Sprintf("XX Cannot query %s: %s", query, err)
 		log.Printf(errStr)
@@ -2757,9 +2950,9 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 		return
 	}
 	defer stmt5.Close()
-	_, err = stmt5.Exec(contentId, m["profileId"].(float64))
+	_, err = stmt5.Exec(contentId, jt.ProfileId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Error during query execution %s with (%d,%f): %s", query, contentId, m["profileId"].(float64), err)
+		errStr := fmt.Sprintf("XX Error during query execution %s with (%d,%d): %s", query, contentId, jt.ProfileId, err)
 		log.Printf(errStr)
 		sendError(w, err.Error())
 		return
@@ -2810,7 +3003,7 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 			result, err = stmt2.Exec(contentId, presetId, *assetIdDependance, outputFilename, doAnalyze)
 		}
 		if err != nil {
-			errStr := fmt.Sprintf("XX Error during query execution %s with %s: %s", query, m["profileId"].(float64), err)
+			errStr := fmt.Sprintf("XX Error during query execution %s with %s: %s", query, jt.ProfileId, err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
@@ -2824,16 +3017,16 @@ func transcode(w http.ResponseWriter, r *http.Request, m map[string]interface{},
 			return
 		}
 		for k, v := range profilesParameters {
-			_, err = stmt3.Exec(m["profileId"].(float64), assetId, k)
+			_, err = stmt3.Exec(jt.ProfileId, assetId, k)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%s, %d, %s): %s", query, m["profileId"].(float64), assetId, k, err)
+				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%d, %d, %s): %s", query, jt.ProfileId, assetId, k, err)
 				log.Printf(errStr)
 				sendError(w, err.Error())
 				return
 			}
-			_, err = stmt4.Exec(m["profileId"].(float64), assetId, k, v)
+			_, err = stmt4.Exec(jt.ProfileId, assetId, k, v)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%s, %d, %s, %s): %s", query, m["profileId"].(float64), assetId, k, v, err)
+				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%d, %d, %s, %s): %s", query, jt.ProfileId, assetId, k, v, err)
 				log.Printf(errStr)
 				sendError(w, err.Error())
 				return
