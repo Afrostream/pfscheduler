@@ -139,11 +139,13 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	//
-	contents := []*database.Content{}
+	var contents []*database.Content
 	//
 	db := database.OpenGormDb()
 	defer db.Close()
-	req := db
+	//FIXME : NCO : When profileId is given, subrequest contains request, solution = clone connection and use it instead
+	subdb := db.New()
+	defer subdb.Close()
 	//
 	if params["id"] != "" {
 		id, err := strconv.Atoi(params["id"])
@@ -154,7 +156,7 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 			return
 		}
 		log.Printf("-- contentsGetHandler, id=%d", id)
-		req = req.Where(database.Content{ID: id})
+		db = db.Where(database.Content{ID: id})
 	}
 	if params["profileId"] != "" {
 		profileId, err := strconv.Atoi(params["profileId"])
@@ -165,31 +167,29 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 			return
 		}
 		log.Printf("-- contentsGetHandler, profileId=%d", profileId)
-		req = req.Joins("JOIN contentsProfiles ON contentsProfiles.contentId = contents.contentId").Where("contentsProfiles.profileId = ?", profileId)
+		db = db.Joins("JOIN contentsProfiles ON contentsProfiles.contentId = contents.contentId").Where("contentsProfiles.profileId = ?", profileId)
 
 	}
 	if params["md5Hash"] != "" {
 		md5Hash := params["md5Hash"]
 		log.Printf("-- contentsGetHandler, md5Hash=%s", md5Hash)
-		req = req.Where(&database.Content{Md5Hash: md5Hash})
+		db = db.Where(database.Content{Md5Hash: md5Hash})
 	}
 	if params["state"] != "" {
 		state := params["state"]
 		log.Printf("-- contentsGetHandler, state=%s", state)
-		req = req.Where(&database.Content{State: state})
+		db = db.Where(database.Content{State: state})
 	}
 	if params["uuid"] != "" {
 		uuid := params["uuid"]
 		log.Printf("-- contentsGetHandler, uuid=%s", uuid)
-		req = req.Where(&database.Content{Uuid: uuid})
+		db = db.Where(database.Content{Uuid: uuid})
 	}
 	//
-	req.Find(&contents)
+	db = db.Find(&contents)
 	for _, content := range contents {
-		contentsProfiles := []*database.ContentsProfile{}
-		req := db
-		req = req.Where(database.ContentsProfile{ContentId: content.ID})
-		req.Find(&contentsProfiles)
+		var contentsProfiles []*database.ContentsProfile
+		subdb.Where(database.ContentsProfile{ContentId: content.ID}).Find(&contentsProfiles)
 		for _, contentsProfile := range contentsProfiles {
 			content.ProfileIds = append(content.ProfileIds, contentsProfile.ProfileId)
 		}
@@ -332,7 +332,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	//
-	contentsStreams := []*database.ContentsStream{}
+	var contentsStreams []*database.ContentsStream
 	//
 	db := database.OpenGormDb()
 	defer db.Close()
@@ -637,7 +637,7 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	//
-	ffmpegLogs := []*database.FfmpegLog{}
+	var ffmpegLogs []*database.FfmpegLog
 	//
 	db := database.OpenGormDb()
 	defer db.Close()
@@ -677,7 +677,7 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	//
-	ffmpegProgresses := []*database.FfmpegProgress{}
+	var ffmpegProgresses []*database.FfmpegProgress
 	//
 	db := database.OpenGormDb()
 	defer db.Close()
@@ -858,7 +858,7 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	//
-	encoders := []*database.Encoder{}
+	var encoders []*database.Encoder
 	//
 	db := database.OpenGormDb()
 	defer db.Close()
@@ -898,7 +898,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	//
-	presets := []*database.Preset{}
+	var presets []*database.Preset
 	//
 	db := database.OpenGormDb()
 	defer db.Close()
@@ -949,7 +949,7 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	//
-	profiles := []*database.Profile{}
+	var profiles []*database.Profile
 	//
 	db := database.OpenGormDb()
 	defer db.Close()
@@ -1235,7 +1235,7 @@ func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWr
 	w.Header().Set("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	//
-	profilesParameters := []*database.ProfilesParameter{}
+	var profilesParameters []*database.ProfilesParameter
 	//
 	db := database.OpenGormDb()
 	defer db.Close()
@@ -2072,7 +2072,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler1(w http.ResponseWriter,
 	}
 	log.Printf("-- pfTranscodePostHandler : loading broadcaster done successfully")
 	log.Printf("-- pfTranscodePostHandler : loading contentsStreams...")
-	contentsStreams := []database.ContentsStream{}
+	var contentsStreams []*database.ContentsStream
 	db.Where("contentId = ? AND type IN ('audio', 'video')", content.ID).Order("type, mapId").Find(&contentsStreams)
 	likeProfile := ""
 	likeProfileSubBurned := ""
@@ -2099,7 +2099,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler1(w http.ResponseWriter,
 	}
 	log.Printf("-- pfTranscodePostHandler : loading contentsStreams done successfully")
 	log.Printf("-- pfTranscodePostHandler : loading subtitles...")
-	var subtitles []database.Subtitle
+	var subtitles []*database.Subtitle
 	db.Where(database.Subtitle{ContentId: content.ID}).Find(&subtitles)
 	reSubStr := ""
 	subsFound := false
@@ -2117,7 +2117,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler1(w http.ResponseWriter,
 	log.Printf("-- pfTranscodePostHandler : likeProfile is %s", likeProfile)
 	log.Printf("-- pfTranscodePostHandler : likeProfileSubBurned is %s", likeProfileSubBurned)
 	log.Printf("-- pfTranscodePostHandler : loading profiles...")
-	var profiles []database.Profile
+	var profiles []*database.Profile
 	db.Where(database.Profile{Broadcaster: broadcaster.Name}).Find(&profiles)
 	var profileMatch int = -1
 	profileNameSelected := ""
@@ -2640,7 +2640,7 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 		return
 	}
 	//Loading presets
-	var presets []database.Preset
+	var presets []*database.Preset
 	db.Where(database.Preset{ProfileId: jt.ProfileId}).Order("presetIdDependance").Find(&presets)
 	var errMsg []string
 	profilesParameters := map[string]string{}
@@ -2664,7 +2664,7 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 				log.Printf("-- transcode : presets looping : profilesParameters %s=%s", v[1], m[v[1]].(string))
 			}
 		}
-		log.Printf("-- transcode : presets looping")
+		log.Printf("-- transcode : presets looping done")
 	}
 	if errMsg != nil {
 		errStr := fmt.Sprintf("failed to load profilesParameters, errors=%s", strings.Join(errMsg, ","))
@@ -2767,6 +2767,7 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	return
 }
 
+//DEPRECATED
 func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[string]interface{}, contentId int) (err error) {
 	log.Printf("-- transcode...")
 	err = nil
