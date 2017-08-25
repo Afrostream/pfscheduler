@@ -197,7 +197,7 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 	//
 	result, err := json.Marshal(contents)
 	if err != nil {
-		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		errStr := fmt.Sprintf("cannot marshal result, error=%s", err)
 		log.Printf("contentsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
@@ -354,7 +354,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 	//
 	result, err := json.Marshal(contentsStreams)
 	if err != nil {
-		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		errStr := fmt.Sprintf("cannot marshal result, error=%s", err)
 		log.Printf("contentsStreamsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
@@ -659,8 +659,8 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 	//
 	result, err := json.Marshal(ffmpegLogs)
 	if err != nil {
-		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot marshal result, error=%s", err)
+		log.Printf("ffmpegLogsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -699,7 +699,7 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 	//
 	result, err := json.Marshal(ffmpegProgresses)
 	if err != nil {
-		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		errStr := fmt.Sprintf("cannot marshal result, error=%s", err)
 		log.Printf("ffmpegProgressGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
@@ -880,7 +880,7 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 	//
 	result, err := json.Marshal(encoders)
 	if err != nil {
-		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		errStr := fmt.Sprintf("cannot marshal result, error=%s", err)
 		log.Printf("encodersGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
@@ -931,7 +931,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 	//
 	result, err := json.Marshal(presets)
 	if err != nil {
-		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		errStr := fmt.Sprintf("cannot marshal result, error=%s", err)
 		log.Printf("presetsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
@@ -971,7 +971,7 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 	//
 	result, err := json.Marshal(profiles)
 	if err != nil {
-		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
+		errStr := fmt.Sprintf("cannot marshal result, error=%s", err)
 		log.Printf("profilesGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
@@ -1257,8 +1257,8 @@ func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWr
 	//
 	result, err := json.Marshal(profilesParameters)
 	if err != nil {
-		errStr := fmt.Sprintf("Cannot marshal result, error=%s", err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot marshal result, error=%s", err)
+		log.Printf("profilesParametersGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2056,16 +2056,16 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler1(w http.ResponseWriter,
 	db := database.OpenGormDb()
 	defer db.Close()
 	log.Printf("-- pfTranscodePostHandler : loading content...")
-	content := database.Content{ID: jpft.ContentId}
-	if db.Where(&content).First(&content).RecordNotFound() {
+	var content database.Content
+	if db.Where(database.Content{ID: jpft.ContentId}).First(&content).RecordNotFound() {
 		log.Printf("pfTranscodePostHandler : no content with contentId=%d", jpft.ContentId)
 		sendError(w, fmt.Sprintf("no content with contentId=%d", jpft.ContentId))
 		return
 	}
 	log.Printf("-- pfTranscodePostHandler : loading content done successfully")
 	log.Printf("-- pfTranscodePostHandler : loading broadacaster...")
-	broadcaster := database.Broadcaster{Name: strings.ToUpper(jpft.Broadcaster)}
-	if db.Where(&broadcaster).First(&broadcaster).RecordNotFound() {
+	var broadcaster database.Broadcaster
+	if db.Where(database.Broadcaster{Name: strings.ToUpper(jpft.Broadcaster)}).First(&broadcaster).RecordNotFound() {
 		log.Printf("pfTranscodePostHandler : no broadcaster named=%d", jpft.Broadcaster)
 		sendError(w, fmt.Sprintf("no broadcaster named=%d", jpft.Broadcaster))
 		return
@@ -2099,8 +2099,8 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler1(w http.ResponseWriter,
 	}
 	log.Printf("-- pfTranscodePostHandler : loading contentsStreams done successfully")
 	log.Printf("-- pfTranscodePostHandler : loading subtitles...")
-	subtitles := []database.Subtitle{}
-	db.Where(&database.Subtitle{ContentId: content.ID}).Find(&subtitles)
+	var subtitles []database.Subtitle
+	db.Where(database.Subtitle{ContentId: content.ID}).Find(&subtitles)
 	reSubStr := ""
 	subsFound := false
 	for _, subtitle := range subtitles {
@@ -2117,8 +2117,8 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler1(w http.ResponseWriter,
 	log.Printf("-- pfTranscodePostHandler : likeProfile is %s", likeProfile)
 	log.Printf("-- pfTranscodePostHandler : likeProfileSubBurned is %s", likeProfileSubBurned)
 	log.Printf("-- pfTranscodePostHandler : loading profiles...")
-	profiles := []database.Profile{}
-	db.Where(&database.Profile{Broadcaster: broadcaster.Name}).Find(&profiles)
+	var profiles []database.Profile
+	db.Where(database.Profile{Broadcaster: broadcaster.Name}).Find(&profiles)
 	var profileMatch int = -1
 	profileNameSelected := ""
 	reProfile := regexp.MustCompile(likeProfile)
@@ -2563,8 +2563,8 @@ func uuidToContentId(uuid string) (contentId int, err error) {
 	log.Printf("-- uuidToContentId...")
 	db := database.OpenGormDb()
 	defer db.Close()
-	content := database.Content{Uuid: uuid}
-	if db.Where(&content).First(&content).RecordNotFound() {
+	var content database.Content
+	if db.Where(database.Content{Uuid: uuid}).First(&content).RecordNotFound() {
 		err = errors.New("RecordNotFound")
 		return
 	}
@@ -2626,22 +2626,22 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	db := database.OpenGormDb()
 	defer db.Close()
 	//Loading content
-	content := database.Content{ID: contentId}
-	if db.Where(&content).First(&content).RecordNotFound() {
+	var content database.Content
+	if db.Where(database.Content{ID: contentId}).First(&content).RecordNotFound() {
 		log.Printf("transcode : no content with contentId=%d", contentId)
 		sendError(w, fmt.Sprintf("no content with contentId=%d", contentId))
 		return
 	}
 	//Loading Profile
-	profile := database.Profile{ID: jt.ProfileId}
-	if db.Where(&profile).First(&profile).RecordNotFound() {
+	var profile database.Profile
+	if db.Where(database.Profile{ID: jt.ProfileId}).First(&profile).RecordNotFound() {
 		log.Printf("transcode : no profile with profileId=%d", jt.ProfileId)
 		sendError(w, fmt.Sprintf("no content with profileId=%d", jt.ProfileId))
 		return
 	}
 	//Loading presets
-	presets := []database.Preset{}
-	db.Where(&database.Preset{ProfileId: jt.ProfileId}).Order("presetIdDependance").Find(&presets)
+	var presets []database.Preset
+	db.Where(database.Preset{ProfileId: jt.ProfileId}).Order("presetIdDependance").Find(&presets)
 	var errMsg []string
 	profilesParameters := map[string]string{}
 	for _, preset := range presets {
@@ -2675,29 +2675,37 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	}
 	//Loading %_USP% Profile
 	USPProfile := database.Profile{}
-	db.Joins("contentsProfiles ON contentsProfiles.profileId = profiles.profileId").
-	Where("contents.contentId = ? AND profiles.name LIKE ?", content.ID, "%_USP%").
-	First(&USPProfile)
+	db.Joins("JOIN contentsProfiles ON contentsProfiles.profileId = profiles.profileId").
+		Where("contentsProfiles.contentId = ? AND profiles.name LIKE ?", content.ID, "%_USP%").
+		First(&USPProfile)
 	//
 	baseContentFilename := path.Base(content.Filename)
 	extension := filepath.Ext(baseContentFilename)
 	contentFilenameBase := baseContentFilename[0 : len(baseContentFilename)-len(extension)]
 	//
 	var assetIdDependance *string = nil
-	presetToAssetIdMap := make(map[int]*int)
+	presetToAssetIdMap := make(map[int]int)
 	//
+	var assets = []database.Asset{}
+	//
+	//--> DATABASE WRITING
+	tx := db.Begin()
 	for _, preset := range presets {
 		outputFilename := encodedBasePath + "/origin/vod/" + contentFilenameBase + "/" + content.Uuid + "_" + preset.Name
 		if preset.PresetIdDependance != "" {
 			assetIdDependance = new(string)
 			presetIdsDependance := strings.Split(preset.PresetIdDependance, `,`)
-			for _, p := range presetIdsDependance {
-				presetIdDependanceAsInt, err := strconv.Atoi(p)
+			for _, presetIdDependance := range presetIdsDependance {
+				var presetIdDependanceAsInt int
+				presetIdDependanceAsInt, err = strconv.Atoi(presetIdDependance)
 				if err != nil {
-					//TODO : ERROR
+					errStr := fmt.Sprintf("presetIdDependance cannot be converted to int, value=%s, error=%s", presetIdDependance, err)
+					log.Printf("transcode : " + errStr)
+					sendError(w, err.Error())
+					return
 				}
-				if presetToAssetIdMap[presetIdDependanceAsInt] != nil {
-					*assetIdDependance += strconv.Itoa(*presetToAssetIdMap[presetIdDependanceAsInt]) + `,`
+				if _, ok := presetToAssetIdMap[presetIdDependanceAsInt]; ok {
+					*assetIdDependance += strconv.Itoa(presetToAssetIdMap[presetIdDependanceAsInt]) + `,`
 				}
 			}
 			*assetIdDependance = (*assetIdDependance)[:len(*assetIdDependance)-1]
@@ -2713,63 +2721,48 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 			outputFilename = content.Filename
 		}
 		log.Printf("-- transcode : outputFilename is %s", outputFilename)
-		//TODO : NCO : should be in a transaction
-		//--> DATABASE
-		//query = "DELETE FROM assets WHERE contentId=? AND presetId=?"
-		/*if assetIdDependance == nil {
-			result, err = stmt2.Exec(contentId, presetId, nil, outputFilename, doAnalyze)
+		//DELETE EXISTING
+		tx.Delete(database.Asset{}, "contentId = ? AND presetId = ?", content.ID, preset.ID)
+		//CREATE NEW ONE
+		log.Printf("-- transcode : asset creation...")
+		var asset database.Asset
+		if assetIdDependance == nil {
+			asset = database.Asset{ContentId: content.ID, PresetId: preset.ID /*No AssetIdDependance means NULL ,*/, Filename: outputFilename, DoAnalyze: preset.DoAnalyze}
 		} else {
-			result, err = stmt2.Exec(contentId, presetId, *assetIdDependance, outputFilename, doAnalyze)
-		}*/
-		//query = "INSERT INTO assets (`contentId`,`presetId`,`assetIdDependance`,`filename`,`doAnalyze`,`createdAt`) VALUES (?,?,?,?,?,NULL)"
-		//<-- DATABASE
-		/*var assetId int64
-		assetId, err = result.LastInsertId()
-		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot get last insert ID with query %s: %s", query, err)
-			log.Printf(errStr)
-			sendError(w, err.Error())
-			return
-		}*/
-		for k, v := range profilesParameters {
-			log.Printf("k=%s, v=%s", k, v)
-			//query = "DELETE FROM profilesParameters WHERE profileId=? AND assetId=? AND parameter=?"
-			/*
-			_, err = stmt3.Exec(jt.ProfileId, assetId, k)
-			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%d, %d, %s): %s", query, jt.ProfileId, assetId, k, err)
-				log.Printf(errStr)
-				sendError(w, err.Error())
-				return
-			}
-			*/
-			//query = "INSERT INTO profilesParameters (`profileId`,`assetId`,`parameter`,`value`,`createdAt`) VALUES (?,?,?,?,NOW())"
-			/*
-			_, err = stmt4.Exec(jt.ProfileId, assetId, k, v)
-			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%d, %d, %s, %s): %s", query, jt.ProfileId, assetId, k, v, err)
-				log.Printf(errStr)
-				sendError(w, err.Error())
-				return
-			}*/
+			asset = database.Asset{ContentId: content.ID, PresetId: preset.ID, AssetIdDependance: assetIdDependance, Filename: outputFilename, DoAnalyze: preset.DoAnalyze}
 		}
-		/*assetIds = append(assetIds, assetId)
-		v := new(int)
-		*v = int(assetId)
-		presetToAssetIdMap[preset.ID] = v*/
+		tx.Create(&asset)
+		log.Printf("-- transcode : asset creation done, ID=%d", asset.ID)
+		for k, v := range profilesParameters {
+			//DELETE EXISTING
+			//TODO : NCO : Is this really needed as we have just created the asset, nothing related to it should alredy exist...
+			//TODO : NCO : parameter is useful when deleting ? Should we not delete all parameters related to the asset/profile ?
+			tx.Delete(database.ProfilesParameter{}, "profileId=? AND assetId=? AND parameter=?", profile.ID, asset.ID, k)
+			//CREATE NEW ONE
+			log.Printf("-- transcode : looping profilesParameter creation...")
+			profilesParameter := database.ProfilesParameter{ProfileId: profile.ID, AssetId: asset.ID, Parameter: k, Value: v}
+			tx.Create(&profilesParameter)
+			log.Printf("-- transcode : looping profilesParameter creation done, ID=%s", profilesParameter.ID)
+		}
+		assets = append(assets, asset)
+		presetToAssetIdMap[preset.ID] = asset.ID
 	}
-	//<-- DATABASE
-	//TODO : to be continued
-	/*database.DbSetContentState(db, contentId, "scheduled")
-
-	jsonAnswer := `{"assetsId":[`
-	for _, a := range assetIds {
-		log.Printf("-- transcode : assetId is: %#v", a)
-		jsonAnswer += strconv.FormatInt(a, 10) + `,`
+	content.State = "scheduled"
+	tx.Save(&content)
+	tx.Commit()
+	//<-- DATABASE WRITING
+	jsonPfTranscodeResponse := JsonPfTranscodeResponse{}
+	for _, asset := range assets {
+		jsonPfTranscodeResponse.AssetIds = append(jsonPfTranscodeResponse.AssetIds, asset.ID)
 	}
-	jsonAnswer = jsonAnswer[:len(jsonAnswer)-1] + `]}`
-
-	w.Write([]byte(jsonAnswer))*/
+	result, err := json.Marshal(jsonPfTranscodeResponse)
+	if err != nil {
+		errStr := fmt.Sprintf("cannot marshal result, error=%s", err)
+		log.Printf("transcode : " + errStr)
+		sendError(w, err.Error())
+		return
+	}
+	w.Write(result)
 	log.Printf("-- transcode v1 done successfully")
 	return
 }
@@ -3055,8 +3048,8 @@ func md5HashToContentId(md5Hash string) (contentId int, err error) {
 	log.Printf("-- md5HashToContentId...")
 	db := database.OpenGormDb()
 	defer db.Close()
-	content := database.Content{Md5Hash: md5Hash}
-	if db.Where(&content).First(&content).RecordNotFound() {
+	var content database.Content
+	if db.Where(database.Content{Md5Hash: md5Hash}).First(&content).RecordNotFound() {
 		err = errors.New("RecordNotFound")
 		return
 	}

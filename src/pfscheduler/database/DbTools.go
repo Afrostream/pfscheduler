@@ -4,16 +4,17 @@ import (
 	"database/sql"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
+	"log"
 	"pfscheduler/tools"
 	"time"
-	"log"
 )
 
 var DbDsn string
 
 func OpenGormDb() (db *gorm.DB) {
 	for {
-		db, err := gorm.Open("mysql", DbDsn)
+		//See : http://jinzhu.me/gorm/database.html#connecting-to-a-database
+		db, err := gorm.Open("mysql", DbDsn+"?parseTime=true")
 		if err == nil {
 			db.LogMode(true)
 			return db
@@ -24,7 +25,8 @@ func OpenGormDb() (db *gorm.DB) {
 }
 
 func OpenGormDbOnce() (db *gorm.DB, err error) {
-	db, err = gorm.Open("mysql", DbDsn)
+	//See : http://jinzhu.me/gorm/database.html#connecting-to-a-database
+	db, err = gorm.Open("mysql", DbDsn+"?parseTime=true")
 	if err != nil {
 		tools.LogOnError(err, "Failed to connect to the database %s, error=%s", DbDsn, err)
 	}
