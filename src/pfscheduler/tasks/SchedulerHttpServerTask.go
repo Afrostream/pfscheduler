@@ -122,6 +122,7 @@ func (h *SchedulerHttpServerTask) Start() {
 
 /* Handlers */
 
+//NCO : REFACTORING : DONE
 func (h *SchedulerHttpServerTask) optionsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- optionsGetHandler...")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Accept")
@@ -131,6 +132,8 @@ func (h *SchedulerHttpServerTask) optionsGetHandler(w http.ResponseWriter, r *ht
 }
 
 // API Handlers
+
+//NCO : REFACTORING : DONE
 func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- contentsGetHandler...")
 	params := mux.Vars(r)
@@ -207,6 +210,7 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 	log.Printf("-- contentsGetHandler done successfully")
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- contentsPostHandler...")
 	body, _ := ioutil.ReadAll(r.Body)
@@ -324,6 +328,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	log.Printf("-- contentsPostHandler done successfully")
 }
 
+//NCO : REFACTORING : DONE
 func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- contentsStreamsGetHandler...")
 	params := mux.Vars(r)
@@ -364,6 +369,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 	log.Printf("-- contentsStreamsGetHandler done successfully")
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- assetsStreamsGetHandler...")
 	var err error
@@ -485,6 +491,8 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 	log.Printf("-- assetsStreamsGetHandler done successfully")
 }
 
+
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- assetsGetHandler...")
 	var err error
@@ -629,6 +637,7 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 	log.Printf("-- assetsGetHandler done successfully")
 }
 
+//NCO : REFACTORING : DONE
 func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- ffmpegLogsGetHandler...")
 	params := mux.Vars(r)
@@ -669,6 +678,7 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 	log.Printf("-- ffmpegLogsGetHandler done successfully")
 }
 
+//NCO : REFACTORING : DONE
 func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- ffmpegProgressGetHandler...")
 	params := mux.Vars(r)
@@ -709,6 +719,7 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 	log.Printf("-- ffmpegProgressGetHandler done successfully")
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- assetsStreamsPostHandler...")
 	var err error
@@ -850,6 +861,7 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 	log.Printf("-- assetsStreamsPostHandler done successfully")
 }
 
+//NCO : REFACTORING : DONE
 func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- encodersGetHandler...")
 	params := mux.Vars(r)
@@ -890,6 +902,7 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 	log.Printf("-- encodersGetHandler done successfully")
 }
 
+//NCO : REFACTORING : DONE
 func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- presetsGetHandler...")
 	params := mux.Vars(r)
@@ -941,6 +954,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 	log.Printf("-- presetsGetHandler done successfully")
 }
 
+//NCO : REFACTORING : DONE
 func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- profilesGetHandler...")
 	params := mux.Vars(r)
@@ -981,6 +995,7 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 	log.Printf("-- profilesGetHandler done successfully")
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- contentsStreamsPostHandler...")
 	var err error
@@ -1104,6 +1119,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 	log.Printf("-- contentsStreamsPostHandler done successfully")
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) contentsStreamsPutHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- contentsStreamsPutHandler...")
 	var err error
@@ -1155,6 +1171,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsPutHandler(w http.ResponseWrite
 	log.Printf("-- contentsStreamsPutHandler done successfully")
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- contentsMd5PostHandler...")
 	var err error
@@ -1227,6 +1244,7 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 	return
 }
 
+//NCO : REFACTORING : DONE
 func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- profilesParametersGetHandler...")
 	params := mux.Vars(r)
@@ -1267,6 +1285,7 @@ func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWr
 	log.Printf("-- profilesParametersGetHandler done successfully")
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- packagePostHandler...")
 	var err error
@@ -1331,6 +1350,7 @@ func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *h
 	log.Printf("-- packagePostHandler done sucessfully")
 }
 
+//NCO : REFACTORING : DONE
 func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- transcodePostHandler...")
 	body, _ := ioutil.ReadAll(r.Body)
@@ -1391,6 +1411,7 @@ func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r 
 	log.Printf("-- transcodePostHandler done successfully")
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- pfManifestGetHandler...")
 	var err error
@@ -1477,6 +1498,7 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 	return
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- pfAssetsChannelsGetHandler...")
 	var err error
@@ -1562,6 +1584,7 @@ func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWrit
 	return
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- pfSubtitlesGetHandler...")
 	var err error
@@ -1661,6 +1684,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	return
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- pfSubtitlesPostHandler...")
 	var filesToMove []string
@@ -1948,6 +1972,7 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	return
 }
 
+//NCO : REFACTORING : WAITING
 func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("-- pfContentsStreamsPostHandler...")
 	body, _ := ioutil.ReadAll(r.Body)
@@ -2389,6 +2414,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 
 /* TOOLS */
 
+//NCO : REFACTORING : WAITING
 func getVideoFileInformations(filename string) (vfi VideoFileInfo, err error) {
 	log.Printf("-- getVideoFileInformations...")
 	vfi.Stat, err = os.Stat(filename)
@@ -2499,6 +2525,7 @@ func getVideoFileInformations(filename string) (vfi VideoFileInfo, err error) {
 	return
 }
 
+//NCO : REFACTORING : WAITING
 func packageContents(contentUuids []ContentsUuid) (errSave error) {
 	log.Printf("-- packageContents...")
 	var stmt *sql.Stmt
@@ -2559,6 +2586,7 @@ func packageContents(contentUuids []ContentsUuid) (errSave error) {
 	return errSave
 }
 
+//NCO : REFACTORING : DONE
 func uuidToContentId(uuid string) (contentId int, err error) {
 	log.Printf("-- uuidToContentId...")
 	db := database.OpenGormDb()
@@ -2573,6 +2601,7 @@ func uuidToContentId(uuid string) (contentId int, err error) {
 	return
 }
 
+//NCO : REFACTORING : WAITING
 func getSubtitles(url string, dest string) (err error) {
 	log.Printf("-- getSubtitles...")
 	var resp *http.Response
@@ -2763,8 +2792,10 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 		assets = append(assets, asset)
 		presetToAssetIdMap[preset.ID] = asset.ID
 	}
+	log.Printf("-- transcode : content ID=%d, state change to 'scheduled'...", content.ID) 
 	content.State = "scheduled"
 	tx.Save(&content)
+	log.Printf("-- transcode : content ID=%d, state change to 'scheduled' done successfully", content.ID) 
 	tx.Commit()
 	log.Printf("-- transcode : database transaction done successfully")
 	//<-- DATABASE WRITING
@@ -3063,6 +3094,7 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	return
 }
 
+//NCO : REFACTORING : DONE
 func md5HashToContentId(md5Hash string) (contentId int, err error) {
 	log.Printf("-- md5HashToContentId...")
 	db := database.OpenGormDb()
