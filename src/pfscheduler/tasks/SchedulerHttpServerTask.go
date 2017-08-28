@@ -150,39 +150,39 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 	if params["id"] != "" {
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
+			errStr := fmt.Sprintf("cannot convert id value '%s' to int: %s", params["id"], err)
 			log.Printf("contentsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("-- contentsGetHandler, id=%d", id)
+		log.Printf("-- contentsGetHandler : id=%d", id)
 		db = db.Where(database.Content{ID: id})
 	}
 	if params["profileId"] != "" {
 		profileId, err := strconv.Atoi(params["profileId"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert profileId value '%s' to int: %s", params["profileId"], err)
+			errStr := fmt.Sprintf("cannot convert profileId value '%s' to int: %s", params["profileId"], err)
 			log.Printf("contentsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("-- contentsGetHandler, profileId=%d", profileId)
+		log.Printf("-- contentsGetHandler : profileId=%d", profileId)
 		db = db.Joins("JOIN contentsProfiles ON contentsProfiles.contentId = contents.contentId").Where("contentsProfiles.profileId = ?", profileId)
 
 	}
 	if params["md5Hash"] != "" {
 		md5Hash := params["md5Hash"]
-		log.Printf("-- contentsGetHandler, md5Hash=%s", md5Hash)
+		log.Printf("-- contentsGetHandler : md5Hash=%s", md5Hash)
 		db = db.Where(database.Content{Md5Hash: md5Hash})
 	}
 	if params["state"] != "" {
 		state := params["state"]
-		log.Printf("-- contentsGetHandler, state=%s", state)
+		log.Printf("-- contentsGetHandler : state=%s", state)
 		db = db.Where(database.Content{State: state})
 	}
 	if params["uuid"] != "" {
 		uuid := params["uuid"]
-		log.Printf("-- contentsGetHandler, uuid=%s", uuid)
+		log.Printf("-- contentsGetHandler : uuid=%s", uuid)
 		db = db.Where(database.Content{Uuid: uuid})
 	}
 	//
@@ -202,7 +202,7 @@ func (h *SchedulerHttpServerTask) contentsGetHandler(w http.ResponseWriter, r *h
 		sendError(w, err.Error())
 		return
 	}
-	log.Printf("-- contentsGetHandler, result=%s", result)
+	log.Printf("-- contentsGetHandler : result=%s", result)
 	w.Write([]byte(result))
 	log.Printf("-- contentsGetHandler done successfully")
 }
@@ -217,7 +217,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	var jcc JsonCreateContent
 	err := json.Unmarshal(body, &jcc)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
+		errStr := fmt.Sprintf("cannot decode JSON %s: %s", body, err)
 		log.Printf("contentsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
@@ -240,8 +240,8 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	var vfi VideoFileInfo
 	vfi, err = getVideoFileInformations(*jcc.Filename)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot get informations from file %s: %s", *jcc.Filename, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot get informations from file %s: %s", *jcc.Filename, err)
+		log.Printf("contentsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -249,8 +249,8 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	// Compute md5sum of file datas
 	md5sum, err := exec.Command(`/usr/bin/md5sum`, *jcc.Filename).Output()
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute md5sum on %s: %s", *jcc.Filename, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot execute md5sum on %s: %s", *jcc.Filename, err)
+		log.Printf("contentsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -260,24 +260,24 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	query := "INSERT INTO contents (`uuid`,`md5Hash`,`filename`,`size`,`duration`,`createdAt`) VALUES (?,?,?,?,?,NULL)"
 	stmt, err := db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("contentsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
 	result, err := stmt.Exec(uuid, md5, *jcc.Filename, vfi.Stat.Size(), vfi.Duration)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%d,%d): %s", query, uuid, *jcc.Filename, vfi.Stat.Size(), vfi.Duration, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("error during query execution %s with (%s,%s,%d,%d): %s", query, uuid, *jcc.Filename, vfi.Stat.Size(), vfi.Duration, err)
+		log.Printf("contentsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	var contentId int64
 	contentId, err = result.LastInsertId()
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot get the last insert contentId with %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot get the last insert contentId with %s: %s", query, err)
+		log.Printf("contentsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -285,15 +285,15 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	for _, vs := range vfi.VideoStreams {
 		stmt, err = db.Prepare("INSERT INTO contentsStreams (`contentId`,`mapId`,`type`,`language`,`codec`,`codecInfo`,`codecProfile`,`bitrate`,`width`,`height`,`fps`,`createdAt`) VALUES (?,?,'video',?,?,?,?,?,?,?,?,NULL)")
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+			log.Printf("contentsPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		_, err = stmt.Exec(contentId, vs.Id, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Error during query execution %s with (%d,%s,%s,%s,%s,%s,%s,%s,%s,%s): %s", query, contentId, vs.Id, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("error during query execution %s with (%d,%s,%s,%s,%s,%s,%s,%s,%s,%s): %s", query, contentId, vs.Id, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, err)
+			log.Printf("contentsPostHandler : " + errStr)
 			sendError(w, err.Error())
 			stmt.Close()
 			return
@@ -303,15 +303,15 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	for _, as := range vfi.AudioStreams {
 		stmt, err = db.Prepare("INSERT INTO contentsStreams (`contentId`,`mapId`,`type`,`language`,`codec`,`codecInfo`,`bitrate`,`frequency`,`createdAt`) VALUES (?,?,'audio',?,?,?,?,?,NULL)")
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+			log.Printf("contentsPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		_, err = stmt.Exec(contentId, as.Id, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%s,%s,%s,%s,%s): %s", query, contentId, as.Id, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("error during query execution %s with (%s,%s,%s,%s,%s,%s,%s): %s", query, contentId, as.Id, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, err)
+			log.Printf("contentsPostHandler : " + errStr)
 			sendError(w, err.Error())
 			stmt.Close()
 			return
@@ -341,12 +341,12 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 	if params["id"] != "" {
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
+			errStr := fmt.Sprintf("cannot convert id value '%s' to int: %s", params["id"], err)
 			log.Printf("contentsStreamsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("-- contentsStreamsGetHandler, id=%d", id)
+		log.Printf("-- contentsStreamsGetHandler : id=%d", id)
 		req = req.Where(database.ContentsStream{ID: id})
 	}
 	//
@@ -359,7 +359,7 @@ func (h *SchedulerHttpServerTask) contentsStreamsGetHandler(w http.ResponseWrite
 		sendError(w, err.Error())
 		return
 	}
-	log.Printf("-- contentsStreamsGetHandler, result=%s", result)
+	log.Printf("-- contentsStreamsGetHandler : result=%s", result)
 	w.Write([]byte(result))
 	log.Printf("-- contentsStreamsGetHandler done successfully")
 }
@@ -380,8 +380,8 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 	if params["id"] != "" {
 		id, err = strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert id %s: %s", params["id"], err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot convert id %s: %s", params["id"], err)
+			log.Printf("assetsStreamsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -389,8 +389,8 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 	if params["contentId"] != "" {
 		contentId, err = strconv.Atoi(params["contentId"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert contentId %s: %s", params["contentId"], err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot convert contentId %s: %s", params["contentId"], err)
+			log.Printf("assetsStreamsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -428,8 +428,8 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 	}
 	stmt, err := db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("assetsStreamsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -450,8 +450,8 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 		}
 	}
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot query rows for %s: %s", query, err)
+		log.Printf("assetsStreamsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -461,15 +461,15 @@ func (h *SchedulerHttpServerTask) assetsStreamsGetHandler(w http.ResponseWriter,
 	for rows.Next() {
 		err = rows.Scan(&s.AssetId, &s.MapId, &s.Type, &s.Language, &s.Codec, &s.CodecInfo, &s.CodecProfile, &s.Bitrate, &s.Frequency, &s.Width, &s.Height, &s.Fps, &s.CreatedAt, &s.UpdatedAt)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot scan rows of query %s: %s", query, err)
+			log.Printf("assetsStreamsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(s)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", s, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot JSON Marshal %#v: %s", s, err)
+			log.Printf("assetsStreamsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -500,8 +500,8 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 	if params["id"] != "" {
 		id, err = strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert id value '%s' to int: %s", id, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot convert id value '%s' to int: %s", id, err)
+			log.Printf("assetsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -509,8 +509,8 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 	if params["contentId"] != "" {
 		contentId, err = strconv.Atoi(params["contentId"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert contentId value '%s' to int: %s", contentId, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot convert contentId value '%s' to int: %s", contentId, err)
+			log.Printf("assetsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -518,8 +518,8 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 	if params["profileId"] != "" {
 		profileId, err = strconv.Atoi(params["profileId"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert profileId value '%s' to int: %s", profileId, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot convert profileId value '%s' to int: %s", profileId, err)
+			log.Printf("assetsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -565,11 +565,11 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 			}
 		}
 	}
-	log.Printf("-- assetsGetHandler query is %s", query)
+	log.Printf("-- assetsGetHandler : query is %s", query)
 	stmt, err := db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("assetsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -594,8 +594,8 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 		}
 	}
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot query rows for %s: %s", query, err)
+		log.Printf("assetsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -605,15 +605,15 @@ func (h *SchedulerHttpServerTask) assetsGetHandler(w http.ResponseWriter, r *htt
 	for rows.Next() {
 		err = rows.Scan(&a.ID, &a.ContentId, &a.PresetId, &a.AssetIdDependance, &a.Filename, &a.DoAnalyze, &a.State, &a.CreatedAt, &a.UpdatedAt)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot scan rows of query %s: %s", query, err)
+			log.Printf("assetsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		b, err := json.Marshal(a)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot JSON Marshal %#v: %s", a, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot JSON Marshal %#v: %s", a, err)
+			log.Printf("assetsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -646,12 +646,12 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 	if params["assetId"] != "" {
 		assetId, err := strconv.Atoi(params["assetId"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert assetId value '%s' to int: %s", params["assetId"], err)
+			errStr := fmt.Sprintf("cannot convert assetId value '%s' to int: %s", params["assetId"], err)
 			log.Printf("ffmpegLogsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("-- ffmpegLogsGetHandler, assetId=%d", assetId)
+		log.Printf("-- ffmpegLogsGetHandler : assetId=%d", assetId)
 		req = req.Where(database.FfmpegLog{AssetId: assetId})
 	}
 	//
@@ -664,7 +664,7 @@ func (h *SchedulerHttpServerTask) ffmpegLogsGetHandler(w http.ResponseWriter, r 
 		sendError(w, err.Error())
 		return
 	}
-	log.Printf("-- ffmpegLogsGetHandler, result=%s", result)
+	log.Printf("-- ffmpegLogsGetHandler : result=%s", result)
 	w.Write([]byte(result))
 	log.Printf("-- ffmpegLogsGetHandler done successfully")
 }
@@ -686,12 +686,12 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 	if params["assetId"] != "" {
 		assetId, err := strconv.Atoi(params["assetId"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert assetId value '%s' to int: %s", params["assetId"], err)
+			errStr := fmt.Sprintf("cannot convert assetId value '%s' to int: %s", params["assetId"], err)
 			log.Printf("ffmpegProgressGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("-- ffmpegProgressGetHandler, assetId=%d", assetId)
+		log.Printf("-- ffmpegProgressGetHandler : assetId=%d", assetId)
 		req = req.Where(database.FfmpegProgress{AssetId: assetId})
 	}
 	//
@@ -704,7 +704,7 @@ func (h *SchedulerHttpServerTask) ffmpegProgressGetHandler(w http.ResponseWriter
 		sendError(w, err.Error())
 		return
 	}
-	log.Printf("-- ffmpegProgressGetHandler, result=%s", result)
+	log.Printf("-- ffmpegProgressGetHandler : result=%s", result)
 	w.Write([]byte(result))
 	log.Printf("-- ffmpegProgressGetHandler done successfully")
 }
@@ -721,8 +721,8 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 	if params["assetId"] != "" {
 		assetId, err = strconv.Atoi(params["assetId"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert id %s: %s", params["id"], err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot convert id %s: %s", params["id"], err)
+			log.Printf("assetsStreamsPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -739,8 +739,8 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 	}
 	stmt, err := db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("assetsStreamsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -752,8 +752,8 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 		rows, err = stmt.Query()
 	}
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot query rows for %s: %s", query, err)
+		log.Printf("assetsStreamsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -764,24 +764,24 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 	for rows.Next() {
 		err = rows.Scan(&assetId, &filename, &doAnalyze)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows of query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot scan rows of query %s: %s", query, err)
+			log.Printf("assetsStreamsPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		var vfi VideoFileInfo
 		vfi, err = getVideoFileInformations(filename)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot get informations from file %s: %s", filename, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot get informations from file %s: %s", filename, err)
+			log.Printf("assetsStreamsPostHandler : " + errStr)
 			continue
 		}
 		if doAnalyze == `yes` {
 			for _, vs := range vfi.VideoStreams {
 				stmt, err = db.Prepare("INSERT INTO assetsStreams (`assetId`,`mapId`,`type`,`language`,`codec`,`codecInfo`,`codecProfile`,`bitrate`,`width`,`height`,`fps`,`createdAt`) VALUES (?,?,'video',?,?,?,?,?,?,?,?,NULL)")
 				if err != nil {
-					errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-					log.Printf(errStr)
+					errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+					log.Printf("assetsStreamsPostHandler : " + errStr)
 					sendError(w, err.Error())
 					return
 				}
@@ -813,8 +813,8 @@ func (h *SchedulerHttpServerTask) assetsStreamsPostHandler(w http.ResponseWriter
 			for _, as := range vfi.AudioStreams {
 				stmt, err = db.Prepare("INSERT INTO assetsStreams (`assetId`,`mapId`,`type`,`language`,`codec`,`codecInfo`,`bitrate`,`frequency`,`createdAt`) VALUES (?,?,'audio',?,?,?,?,?,NULL)")
 				if err != nil {
-					errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-					log.Printf(errStr)
+					errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+					log.Printf("assetsStreamsPostHandler : " + errStr)
 					sendError(w, err.Error())
 					return
 				}
@@ -867,12 +867,12 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 	if params["id"] != "" {
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
+			errStr := fmt.Sprintf("cannot convert id value '%s' to int: %s", params["id"], err)
 			log.Printf("encodersGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("-- encodersGetHandler, id=%d", id)
+		log.Printf("-- encodersGetHandler : id=%d", id)
 		req = req.Where(database.Encoder{ID: id})
 	}
 	//
@@ -885,7 +885,7 @@ func (h *SchedulerHttpServerTask) encodersGetHandler(w http.ResponseWriter, r *h
 		sendError(w, err.Error())
 		return
 	}
-	log.Printf("-- encodersGetHandler, result=%s", result)
+	log.Printf("-- encodersGetHandler : result=%s", result)
 	w.Write([]byte(result))
 	log.Printf("-- encodersGetHandler done successfully")
 }
@@ -907,23 +907,23 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 	if params["id"] != "" {
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
+			errStr := fmt.Sprintf("cannot convert id value '%s' to int: %s", params["id"], err)
 			log.Printf("presetsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("-- presetsGetHandler, id=%d", id)
+		log.Printf("-- presetsGetHandler : id=%d", id)
 		req = req.Where(database.Preset{ID: id})
 	}
 	if params["profileId"] != "" {
 		profileId, err := strconv.Atoi(params["profileId"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert profileId value '%s' to int: %s", params["profileId"], err)
+			errStr := fmt.Sprintf("cannot convert profileId value '%s' to int: %s", params["profileId"], err)
 			log.Printf("presetsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("-- presetsGetHandler, profileId=%d", profileId)
+		log.Printf("-- presetsGetHandler : profileId=%d", profileId)
 		req = req.Where(database.Preset{ProfileId: profileId})
 	}
 	//
@@ -936,7 +936,7 @@ func (h *SchedulerHttpServerTask) presetsGetHandler(w http.ResponseWriter, r *ht
 		sendError(w, err.Error())
 		return
 	}
-	log.Printf("-- presetsGetHandler, result=%s", result)
+	log.Printf("-- presetsGetHandler : result=%s", result)
 	w.Write([]byte(result))
 	log.Printf("-- presetsGetHandler done successfully")
 }
@@ -958,12 +958,12 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 	if params["id"] != "" {
 		id, err := strconv.Atoi(params["id"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert id value '%s' to int: %s", params["id"], err)
+			errStr := fmt.Sprintf("cannot convert id value '%s' to int: %s", params["id"], err)
 			log.Printf("profilesGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("-- profilesGetHandler, id=%d", id)
+		log.Printf("-- profilesGetHandler : id=%d", id)
 		req = req.Where(database.Profile{ID: id})
 	}
 	//
@@ -976,7 +976,7 @@ func (h *SchedulerHttpServerTask) profilesGetHandler(w http.ResponseWriter, r *h
 		sendError(w, err.Error())
 		return
 	}
-	log.Printf("-- profilesGetHandler, result=%s", result)
+	log.Printf("-- profilesGetHandler : result=%s", result)
 	w.Write([]byte(result))
 	log.Printf("-- profilesGetHandler done successfully")
 }
@@ -994,8 +994,8 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 	if params["contentId"] != "" {
 		contentId, err = strconv.Atoi(params["contentId"])
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot convert contentId %s: %s", params["contentId"], err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot convert contentId %s: %s", params["contentId"], err)
+			log.Printf("contentsStreamsPostHandler : " +errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1008,8 +1008,8 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 	query = "SELECT contentId,filename FROM contents WHERE contentId=?"
 	stmt, err := db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("contentsStreamsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1017,8 +1017,8 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 	var rows *sql.Rows
 	rows, err = stmt.Query(contentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query rows for %s (%d): %s", query, contentId, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot query rows for %s (%d): %s", query, contentId, err)
+		log.Printf("contentsStreamsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1036,15 +1036,15 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 		var vfi VideoFileInfo
 		vfi, err = getVideoFileInformations(filename)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot get informations from file %s: %s", filename, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot get informations from file %s: %s", filename, err)
+			log.Printf("contentsStreamsPostHandler : " + errStr)
 			continue
 		}
 		for _, vs := range vfi.VideoStreams {
 			stmt, err = db.Prepare("INSERT INTO contentsStreams (`contentId`,`mapId`,`type`,`language`,`codec`,`codecInfo`,`codecProfile`,`bitrate`,`width`,`height`,`fps`,`createdAt`) VALUES (?,?,'video',?,?,?,?,?,?,?,?,NULL)")
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+				log.Printf("contentsStreamsPostHandler : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
@@ -1054,16 +1054,16 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 				query = "UPDATE contentsStreams SET language=?,codec=?,codecInfo=?,codecProfile=?,bitrate=?,width=?,height=?,fps=?,updatedAt=NOW() WHERE contentId=? AND mapId=? AND type='video'"
 				stmt, err = db.Prepare(query)
 				if err != nil {
-					errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-					log.Printf(errStr)
+					errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+					log.Printf("contentsStreamsPostHandler : " + errStr)
 					sendError(w, err.Error())
 					return
 				}
 				defer stmt.Close()
 				_, err = stmt.Exec(vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, contentId, vs.Id)
 				if err != nil {
-					errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%s,%s,%s,%s,%s,%s) WHERE (%d,%s): %s", query, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, contentId, vs.Id, err)
-					log.Printf(errStr)
+					errStr := fmt.Sprintf("error during query execution %s with (%s,%s,%s,%s,%s,%s,%s,%s) WHERE (%d,%s): %s", query, vs.Language, vs.Codec, vs.CodecInfo, vs.CodecProfile, vs.Bitrate, vs.Width, vs.Height, vs.Fps, contentId, vs.Id, err)
+					log.Printf("contentsStreamsPostHandler : " + errStr)
 					sendError(w, err.Error())
 					return
 				}
@@ -1072,8 +1072,8 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 		for _, as := range vfi.AudioStreams {
 			stmt, err = db.Prepare("INSERT INTO contentsStreams (`contentId`,`mapId`,`type`,`language`,`codec`,`codecInfo`,`bitrate`,`frequency`,`createdAt`) VALUES (?,?,'audio',?,?,?,?,?,NULL)")
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+				log.Printf("contentsStreamsPostHandler : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
@@ -1083,16 +1083,16 @@ func (h *SchedulerHttpServerTask) contentsStreamsPostHandler(w http.ResponseWrit
 				query = "UPDATE contentsStreams SET language=?,codec=?,codecInfo=?,bitrate=?,frequency=?,updatedAt=NOW() WHERE contentId=? AND mapId=? AND type='audio'"
 				stmt, err = db.Prepare(query)
 				if err != nil {
-					errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-					log.Printf(errStr)
+					errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+					log.Printf("contentsStreamsPostHandler : " + errStr)
 					sendError(w, err.Error())
 					return
 				}
 				defer stmt.Close()
 				_, err = stmt.Exec(as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, contentId, as.Id)
 				if err != nil {
-					errStr := fmt.Sprintf("XX Error during query execution %s with (%s,%s,%s,%s,%s,%s,%s) WHERE (%d,%s): %s", query, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, contentId, as.Id, err)
-					log.Printf(errStr)
+					errStr := fmt.Sprintf("error during query execution %s with (%s,%s,%s,%s,%s,%s,%s) WHERE (%d,%s): %s", query, as.Language, as.Codec, as.CodecInfo, as.Bitrate, as.Frequency, contentId, as.Id, err)
+					log.Printf("contentsStreamsPostHandler : " + errStr)
 					sendError(w, err.Error())
 					return
 				}
@@ -1115,14 +1115,14 @@ func (h *SchedulerHttpServerTask) contentsStreamsPutHandler(w http.ResponseWrite
 	var cspj ContentsStreamsPutJson
 	err = json.Unmarshal(body, &cspj)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot decode JSON %s: %s", body, err)
+		log.Printf("contentsStreamsPutHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	if cspj.Language == nil {
-		errStr := fmt.Sprintf("XX Language JSON parameter is missing")
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("language JSON parameter is missing")
+		log.Printf("contentsStreamsPutHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1136,16 +1136,16 @@ func (h *SchedulerHttpServerTask) contentsStreamsPutHandler(w http.ResponseWrite
 	var stmt *sql.Stmt
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("contentsStreamsPutHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
 	_, err = stmt.Exec(cspj.Language, params["contentsStreamId"])
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("contentsStreamsPutHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1170,8 +1170,8 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 	var stmt *sql.Stmt
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("contentsMd5PostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1179,8 +1179,8 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 	var rows *sql.Rows
 	rows, err = stmt.Query()
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot execute query %s: %s", query, err)
+		log.Printf("contentsMd5PostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1190,15 +1190,15 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 	for rows.Next() {
 		err = rows.Scan(&contentId, &filename)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan row for query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot scan row for query %s: %s", query, err)
+			log.Printf("contentsMd5PostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		md5sum, err := exec.Command(`/usr/bin/md5sum`, filename).Output()
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot execute md5sum for %s: %s", filename, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot execute md5sum for %s: %s", filename, err)
+			log.Printf("contentsMd5PostHandler : " + errStr)
 			continue
 		}
 		md5 := strings.Split(string(md5sum), ` `)[0]
@@ -1206,15 +1206,15 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 		var stmt2 *sql.Stmt
 		stmt2, err = db.Prepare(query)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+			log.Printf("contentsMd5PostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		_, err = stmt2.Exec(md5, contentId)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot execute query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot execute query %s: %s", query, err)
+			log.Printf("contentsMd5PostHandler : " + errStr)
 			sendError(w, err.Error())
 			stmt2.Close()
 			return
@@ -1244,12 +1244,12 @@ func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWr
 	if params["presetParameterId"] != "" {
 		presetParameterId, err := strconv.Atoi(params["presetParameterId"])
 		if err != nil {
-			errStr := fmt.Sprintf("Cannot convert presetParameterId value '%s' to int: %s", params["presetParameterId"], err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot convert presetParameterId value '%s' to int: %s", params["presetParameterId"], err)
+			log.Printf("profilesParametersGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("-- profilesParametersGetHandler, id=%d", presetParameterId)
+		log.Printf("-- profilesParametersGetHandler : id=%d", presetParameterId)
 		req = req.Where(database.ProfilesParameter{ID: presetParameterId})
 	}
 	//
@@ -1262,7 +1262,7 @@ func (h *SchedulerHttpServerTask) profilesParametersGetHandler(w http.ResponseWr
 		sendError(w, err.Error())
 		return
 	}
-	log.Printf("-- profilesParametersGetHandler, result=%s", result)
+	log.Printf("-- profilesParametersGetHandler : result=%s", result)
 	w.Write([]byte(result))
 	log.Printf("-- profilesParametersGetHandler done successfully")
 }
@@ -1278,8 +1278,8 @@ func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *h
 	var jpc JsonPackageContent
 	err = json.Unmarshal(body, &jpc)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot decode JSON %s: %s", body, err)
+		log.Printf("packagePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1301,16 +1301,16 @@ func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *h
 		query := "SELECT uuid FROM contents WHERE contentId=?"
 		stmt, err := db.Prepare(query)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+			log.Printf("packagePostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		defer stmt.Close()
 		err = stmt.QueryRow(cId).Scan(&cuuid.Uuid)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot query row for query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot query row for query %s: %s", query, err)
+			log.Printf("packagePostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1320,8 +1320,8 @@ func (h *SchedulerHttpServerTask) packagePostHandler(w http.ResponseWriter, r *h
 
 	err = packageContents(cuuids)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot pacakge contents %#v: %s", cuuids, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot pacakge contents %#v: %s", cuuids, err)
+		log.Printf("packagePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1342,32 +1342,32 @@ func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r 
 	m := map[string]interface{}{}
 	err := json.Unmarshal(body, &m)
 	if err != nil {
-		errStr := fmt.Sprintf("transcodePostHandler : Cannot decode JSON %s: %s", body, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot decode JSON %s: %s", body, err)
+		log.Printf("transcodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	/************************************************************************************************/
 	jt, err := newJsonTranscodeFromBytes(body)
 	if err != nil {
-		errStr := fmt.Sprintf("transcodePostHandler : Cannot decode JSON %s: %s", body, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot decode JSON %s: %s", body, err)
+		log.Printf("transcodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	// Validate datas
 	if jt.ProfileId == 0 {
-		errStr := fmt.Sprintf("transcodePostHandler : 'profileId' is missing")
-		log.Printf(errStr)
-		sendError(w, "'profileId' is missing")
+		errStr := fmt.Sprintf("'profileId' is missing")
+		log.Printf("transcodePostHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 	var contentId int
 	if jt.Uuid != "" {
 		contentId, err = uuidToContentId(jt.Uuid)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot get contenId from uuid %s: %s", jt.Uuid, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot get contenId from uuid %s: %s", jt.Uuid, err)
+			log.Printf("transcodePostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1375,16 +1375,16 @@ func (h *SchedulerHttpServerTask) transcodePostHandler(w http.ResponseWriter, r 
 	if jt.Md5Hash != "" {
 		contentId, err = md5HashToContentId(jt.Md5Hash)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot get contenId from md5Hash %s: %s", jt.Md5Hash, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot get contenId from md5Hash %s: %s", jt.Md5Hash, err)
+			log.Printf("transcodePostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 	}
 	if contentId == 0 {
-		errStr := fmt.Sprintf("transcodePostHandler : no content found because 'uuid' or 'md5Hash' is missing")
-		log.Printf(errStr)
-		sendError(w, "no content found because 'uuid' or 'md5Hash' is missing")
+		errStr := fmt.Sprintf("no content found because 'uuid' or 'md5Hash' is missing")
+		log.Printf("transcodePostHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 	err = h.transcode(w, r, jt, m, contentId)
@@ -1400,15 +1400,15 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	params := mux.Vars(r)
 	if params["broadcaster"] == "" {
-		errStr := fmt.Sprintf("XX broadcaster JSON parameter is missing")
-		log.Printf(errStr)
-		sendError(w, "'broadcaster' parameter is missing")
+		errStr := fmt.Sprintf("'broadcaster' parameter is missing")
+		log.Printf("pfManifestGetHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 	if params["contentId"] == "" {
-		errStr := fmt.Sprintf("XX contentId JSON parameter is missing")
-		log.Printf(errStr)
-		sendError(w, "'contentId' parameter is missing")
+		errStr := fmt.Sprintf("'contentId' parameter is missing")
+		log.Printf("pfManifestGetHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 
@@ -1419,8 +1419,8 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 	var stmt *sql.Stmt
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("pfManifestGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1429,8 +1429,8 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 	var cmdLine string
 	err = stmt.QueryRow(params["contentId"], strings.ToUpper(params["broadcaster"])).Scan(&state, &cmdLine)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot Scan result query %s with (%s, %s): %s", query, params["contentId"], strings.ToUpper(params["broadcaster"]), err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot Scan result query %s with (%s, %s): %s", query, params["contentId"], strings.ToUpper(params["broadcaster"]), err)
+		log.Printf("pfManifestGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1439,8 +1439,8 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 		var stmt *sql.Stmt
 		stmt, err = db.Prepare(query)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+			log.Printf("pfManifestGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1449,8 +1449,8 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 		var filenamePath string
 		err = stmt.QueryRow(params["contentId"]).Scan(&uuid, &filenamePath)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot Scan result query %s with (%s): %s", query, params["contentId"], err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot Scan result query %s with (%s): %s", query, params["contentId"], err)
+			log.Printf("pfManifestGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1466,9 +1466,9 @@ func (h *SchedulerHttpServerTask) pfManifestGetHandler(w http.ResponseWriter, r 
 			w.Write([]byte(jsonStr))
 			return
 		} else {
-			errStr := fmt.Sprintf("XX Cannot found ism package from cmdLine")
-			log.Printf(errStr)
-			sendError(w, "cannot found ism package from db")
+			errStr := fmt.Sprintf("cannot found ism package from cmdLine")
+			log.Printf("pfManifestGetHandler : " + errStr)
+			sendError(w, errStr)
 			return
 		}
 	}
@@ -1486,21 +1486,21 @@ func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWrit
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	params := mux.Vars(r)
 	if params["broadcaster"] == "" {
-		errStr := fmt.Sprintf("XX broadcaster JSON parameter is missing")
-		log.Printf(errStr)
-		sendError(w, "'broadcaster' parameter is missing")
+		errStr := fmt.Sprintf("'broadcaster' parameter is missing")
+		log.Printf("pfAssetsChannelsGetHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 	if params["contentId"] == "" {
-		errStr := fmt.Sprintf("XX contentId JSON parameter is missing")
-		log.Printf(errStr)
-		sendError(w, "'contentId' parameter is missing")
+		errStr := fmt.Sprintf("'contentId' parameter is missing")
+		log.Printf("pfAssetsChannelsGetHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 	if params["type"] == "" {
-		errStr := fmt.Sprintf("XX type JSON parameter is missing")
-		log.Printf(errStr)
-		sendError(w, "'type' parameter is missing")
+		errStr := fmt.Sprintf("'type' parameter is missing")
+		log.Printf("pfAssetsChannelsGetHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 
@@ -1511,8 +1511,8 @@ func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWrit
 	var stmt *sql.Stmt
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("pfAssetsChannelsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1520,8 +1520,8 @@ func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWrit
 	var rows *sql.Rows
 	rows, err = stmt.Query(params["contentId"], params["type"], strings.ToUpper(params["broadcaster"]))
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s,%s): %s", query, params["contentId"], strings.ToUpper(params["broadcaster"]), err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot execute query %s with (%s,%s): %s", query, params["contentId"], strings.ToUpper(params["broadcaster"]), err)
+		log.Printf("pfAssetsChannelsGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1542,8 +1542,8 @@ func (h *SchedulerHttpServerTask) pfAssetsChannelsGetHandler(w http.ResponseWrit
 		var fps *int
 		err = rows.Scan(&mapId, &language, &codec, &codecInfo, &codecProfile, &bitrate, &frequency, &width, &height, &fps)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot get row for query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot get row for query %s: %s", query, err)
+			log.Printf("pfAssetsChannelsGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1571,15 +1571,15 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	params := mux.Vars(r)
 	if params["contentId"] == "" {
-		errStr := fmt.Sprintf("XX contentId JSON parameter is missing")
-		log.Printf(errStr)
-		sendError(w, "'contentId' parameter is missing")
+		errStr := fmt.Sprintf("'contentId' parameter is missing")
+		log.Printf("pfSubtitlesGetHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 	if params["broadcaster"] == "" {
-		errStr := fmt.Sprintf("XX broadcaster JSON parameter is missing")
-		log.Printf(errStr)
-		sendError(w, "'broadcaster' parameter is missing")
+		errStr := fmt.Sprintf("'broadcaster' parameter is missing")
+		log.Printf("pfSubtitlesGetHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 
@@ -1590,8 +1590,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	var stmt *sql.Stmt
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("pfSubtitlesGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1599,8 +1599,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	var profileName string
 	err = stmt.QueryRow(params["contentId"], `%SUB%_`+strings.ToUpper(params["broadcaster"])).Scan(&profileName)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, params["contentId"])
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot execute query %s with (%s): %s", query, params["contentId"])
+		log.Printf("pfSubtitlesGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1622,8 +1622,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	}
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("pfSubtitlesGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1631,8 +1631,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 	var rows *sql.Rows
 	rows, err = stmt.Query(params["contentId"])
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, params["contentId"], err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot execute query %s with (%s): %s", query, params["contentId"], err)
+		log.Printf("pfSubtitlesGetHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1644,8 +1644,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesGetHandler(w http.ResponseWriter, r
 		var url string
 		err = rows.Scan(&lang, &url)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot get row for query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot get row for query %s: %s", query, err)
+			log.Printf("pfSubtitlesGetHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1673,8 +1673,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	var jss JsonSetSubtitles
 	err := json.Unmarshal(body, &jss)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot decode JSON %s: %s", body, err)
+		log.Printf("pfSubtitlesPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1708,8 +1708,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	var stmt2 *sql.Stmt
 	stmt2, err = db.Prepare(query2)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query2, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query2, err)
+		log.Printf("pfSubtitlesPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1719,8 +1719,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	var stmt *sql.Stmt
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("pfSubtitlesPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1730,8 +1730,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	var stmt3 *sql.Stmt
 	stmt3, err = db.Prepare(query3)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query3, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query3, err)
+		log.Printf("pfSubtitlesPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1741,31 +1741,31 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	var stmt4 *sql.Stmt
 	stmt4, err = db.Prepare(query4)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query4, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query4, err)
+		log.Printf("pfSubtitlesPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 
 	_, err = stmt2.Exec(*jss.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query2, *jss.ContentId, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot execute query %s with (%d): %s", query2, *jss.ContentId, err)
+		log.Printf("pfSubtitlesPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	for _, s := range *jss.Subtitles {
 		_, err = stmt.Exec(*jss.ContentId, *s.Lang, *s.Url)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%s,%s): %s", query, *jss.ContentId, *s.Lang, *s.Url, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot execute query %s with (%d,%s,%s): %s", query, *jss.ContentId, *s.Lang, *s.Url, err)
+			log.Printf("pfSubtitlesPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		err = getSubtitles(*s.Url, `/space/videos/encoded/tmp/`+path.Base(*s.Url))
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot GET url %s: %s", query, *s.Url, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot GET url %s: %s", query, *s.Url, err)
+			log.Printf("pfSubtitlesPostHandler :  " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1775,8 +1775,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	var rows *sql.Rows
 	rows, err = stmt3.Query(*jss.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query3, *jss.ContentId, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot execute query %s with (%d): %s", query3, *jss.ContentId, err)
+		log.Printf("pfSubtitlesPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1791,8 +1791,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 		var broadcaster string
 		err = rows.Scan(&profileName, &profileId, &broadcaster, &acceptSubs)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot scan rows for query %s: %s", query, err)
+			log.Printf("pfSubtitlesPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1803,8 +1803,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 		var rows2 *sql.Rows
 		rows2, err = stmt4.Query(broadcaster)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query4, broadcaster, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot execute query %s with (%s): %s", query4, broadcaster, err)
+			log.Printf("pfSubtitlesPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1815,8 +1815,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 			var profileId2 int
 			err = rows2.Scan(&profileName2, &profileId2)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot scan rows for query %s: %s", query, err)
+				log.Printf("pfSubtitlesPostHandler : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
@@ -1846,8 +1846,8 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 	query = "SELECT filename FROM contents WHERE contentId=?"
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query4, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query4, err)
+		log.Printf("pfSubtitlesPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1861,29 +1861,29 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 		newPath := newDir + `/` + path.Base(f)
 		err = os.Rename(f, strings.Replace(newPath, " ", "_", -1))
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot move file from %s to %s: %s", f, newPath, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot move file from %s to %s: %s", f, newPath, err)
+			log.Printf("pfSubtitlesPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 	}
 
 	// Depending on profile, set state='scheduled' for packaging task or delete old profile and add new one for subtitles burned on the video
-	log.Printf("profile to repackage is %#v", profileToRepackage)
-	log.Printf("profile to replace is %#v", profileToReplace)
+	log.Printf("-- pfSubtitlesPostHandler : profile to repackage is %#v", profileToRepackage)
+	log.Printf("-- pfSubtitlesPostHandler : profile to replace is %#v", profileToReplace)
 	for _, p := range profileToRepackage {
 		query = `UPDATE assets AS a LEFT JOIN presets AS p ON a.presetId=p.presetId SET state='scheduled' WHERE contentId=? AND p.profileId=? AND type='script' AND cmdLine LIKE '%package%'`
 		stmt, err = db.Prepare(query)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+			log.Printf("pfSubtitlesPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		_, err = stmt.Exec(*jss.ContentId, p)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p, err)
+			log.Printf("pfSubtitlesPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -1893,15 +1893,15 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 			query = `UPDATE assets AS a LEFT JOIN presets AS p ON a.presetId=p.presetId SET state='scheduled' WHERE contentId=? AND p.profileId=?`
 			stmt, err = db.Prepare(query)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+				log.Printf("pfSubtitlesPostHandler : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
 			_, err = stmt.Exec(*jss.ContentId, p.newProfileId)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p.newProfileId, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p.newProfileId, err)
+				log.Printf("pfSubtitlesPostHandler : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
@@ -1909,30 +1909,30 @@ func (h *SchedulerHttpServerTask) pfSubtitlesPostHandler(w http.ResponseWriter, 
 			query = "DELETE FROM contensProfiles WHERE contentId=? AND profileId=?"
 			stmt, err = db.Prepare(query)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+				log.Printf("pfSubtitlesPostHandler : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
 			_, err = stmt.Exec(*jss.ContentId, p.newProfileId)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p.newProfileId, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p.newProfileId, err)
+				log.Printf("pfSubtitlesPostHandler : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
 			query = "DELETE FROM assets AS a LEFT JOIN presets AS p ON a.presetId=p.presetId WHERE contentId=? AND p.profileId=?"
 			stmt, err = db.Prepare(query)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+				log.Printf("pfSubtitlesPostHandler : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
 			_, err = stmt.Exec(*jss.ContentId, p.oldProfileId)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p.oldProfileId, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot execute query %s with (%d,%d): %s", query, *jss.ContentId, p.oldProfileId, err)
+				log.Printf("pfSubtitlesPostHandler : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
@@ -1958,8 +1958,8 @@ func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWr
 	var jscs JsonSetContentsStreams
 	err := json.Unmarshal(body, &jscs)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot decode JSON %s: %s", body, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot decode JSON %s: %s", body, err)
+		log.Printf("pfContentsStreamsPostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -1997,16 +1997,16 @@ func (h *SchedulerHttpServerTask) pfContentsStreamsPostHandler(w http.ResponseWr
 		var stmt *sql.Stmt
 		stmt, err = db.Prepare(query)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+			log.Printf("pfContentsStreamsPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		defer stmt.Close()
 		_, err = stmt.Exec(*s.Lang, *jscs.ContentId, *s.Channel, *s.Type)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot execute query %s with (%d,%s,%s): %s", query, *s.Channel, *s.Type, *s.Lang, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot execute query %s with (%d,%s,%s): %s", query, *s.Channel, *s.Type, *s.Lang, err)
+			log.Printf("pfContentsStreamsPostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -2035,7 +2035,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler1(w http.ResponseWriter,
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	jpft, err := newJsonPfTranscodeFromBytes(body)
 	if err != nil {
-		errStr := fmt.Sprintf("Cannot decode JSON %s: %s", body, err)
+		errStr := fmt.Sprintf("cannot decode JSON %s: %s", body, err)
 		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
@@ -2160,9 +2160,9 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler1(w http.ResponseWriter,
 	m := make(map[string]interface{})
 	err = h.transcode(w, r, jt, m, content.ID)
 	if err != nil {
-		errStr := fmt.Sprintf("pfTranscodePostHandler : Cannot transcode contentId %d with profileId %d, error=%s", content.ID, profileMatch, err)
+		errStr := fmt.Sprintf("pfTranscodePostHandler : cannot transcode contentId %d with profileId %d, error=%s", content.ID, profileMatch, err)
 		log.Printf(errStr)
-		sendError(w, fmt.Sprintf("Cannot transcode contentId %d with profileId %d, error=%s", content.ID, profileMatch, err))
+		sendError(w, fmt.Sprintf("cannot transcode contentId %d with profileId %d, error=%s", content.ID, profileMatch, err))
 		return
 	}
 	log.Printf("-- pfTranscodePostHandler v1 done successfully")
@@ -2178,7 +2178,7 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	jpft, err := newJsonPfTranscodeFromBytes(body)
 	if err != nil {
-		errStr := fmt.Sprintf("Cannot decode JSON %s: %s", body, err)
+		errStr := fmt.Sprintf("cannot decode JSON %s: %s", body, err)
 		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
@@ -2202,8 +2202,8 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	var stmt *sql.Stmt
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2211,8 +2211,8 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	var rows *sql.Rows
 	rows, err = stmt.Query(jpft.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, jpft.ContentId, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot execute query %s with (%d): %s", query, jpft.ContentId, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2226,8 +2226,8 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 		var lang string
 		err = rows.Scan(&streamType, &lang)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot scan rows for query %s: %s", query, err)
+			log.Printf("pfTranscodePostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -2252,16 +2252,16 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	query = `SELECT lang FROM subtitles WHERE contentId=?`
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
 	rows, err = stmt.Query(jpft.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%d): %s", query, jpft.ContentId, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot execute query %s with (%d): %s", query, jpft.ContentId, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2272,8 +2272,8 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 		var lang string
 		err = rows.Scan(&lang)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot scan rows for query %s: %s", query, err)
+			log.Printf("pfTranscodePostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -2292,16 +2292,16 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	query = `SELECT profileId, name FROM profiles WHERE broadcaster=?`
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
 	rows, err = stmt.Query(strings.ToUpper(jpft.Broadcaster))
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, jpft.Broadcaster, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot execute query %s with (%s): %s", query, jpft.Broadcaster, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2315,14 +2315,14 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 		var name string
 		err = rows.Scan(&profileId, &name)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot scan rows for query %s: %s", query, err)
+			log.Printf("pfTranscodePostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
-		log.Printf("name is %s", name)
+		log.Printf("-- pfTranscodePostHandler : name is %s", name)
 		if reProfile.Match([]byte(name)) == true || (likeProfileSubBurned != "" && reProfileSubBurned.Match([]byte(name)) == true) {
-			log.Printf("profile %s (%d) match", name, profileId)
+			log.Printf("-- pfTranscodePostHandler : profile %s (%d) match", name, profileId)
 			if len(name) > len(profileNameSelected) {
 				profileNameSelected = name
 				profileMatch = profileId
@@ -2331,17 +2331,17 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	}
 
 	if profileMatch == -1 {
-		errStr := `XX There is no profile matching the transcoding request`
-		log.Printf(errStr)
-		sendError(w, "There is no profile matching the transcoding request")
+		errStr := "There is no profile matching the transcoding request"
+		log.Printf("pfTranscodePostHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 
 	query = `SELECT p.profileId FROM contentsProfiles AS cp LEFT JOIN profiles AS p ON cp.profileId=p.profileId WHERE contentId=? AND broadcaster=?`
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2349,8 +2349,8 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 	currentProfileId := -1
 	err = stmt.QueryRow(jpft.ContentId, jpft.Broadcaster).Scan(&currentProfileId)
 	if err != nil && err != sql.ErrNoRows {
-		errStr := fmt.Sprintf("XX Cannot scan rows for query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot scan rows for query %s: %s", query, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2358,29 +2358,29 @@ func (h *SchedulerHttpServerTask) pfTranscodePostHandler0(w http.ResponseWriter,
 		query = `DELETE FROM contentsProfiles WHERE contentId=? AND profileId=?`
 		stmt, err = db.Prepare(query)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+			log.Printf("pfTranscodePostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		defer stmt.Close()
 		_, err = stmt.Exec(jpft.ContentId, currentProfileId)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot execute query %s with (%s): %s", query, jpft.Broadcaster, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot execute query %s with (%s): %s", query, jpft.Broadcaster, err)
+			log.Printf("pfTranscodePostHandler : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 	}
 
-	log.Printf("profileMatch is %d", profileMatch)
+	log.Printf("-- pfTranscodePostHandler : profileMatch is %d", profileMatch)
 	jt := JsonTranscode{ProfileId: profileMatch}
 	m := make(map[string]interface{})
 	err = h.transcode(w, r, jt, m, jpft.ContentId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot transcode contentId %d with profileId %d: %s", jpft.ContentId, profileMatch, err)
-		log.Printf(errStr)
-		sendError(w, fmt.Sprintf("Cannot transcode contentId %d with profileId %d: %s", jpft.ContentId, profileMatch, err))
+		errStr := fmt.Sprintf("cannot transcode contentId %d with profileId %d: %s", jpft.ContentId, profileMatch, err)
+		log.Printf("pfTranscodePostHandler : " + errStr)
+		sendError(w, errStr)
 		return
 	}
 	log.Printf("-- pfTranscodePostHandler done successfully")
@@ -2494,7 +2494,7 @@ func getVideoFileInformations(filename string) (vfi VideoFileInfo, err error) {
 		vfi.AudioStreams = append(vfi.AudioStreams, as)
 	}
 
-	log.Printf("ffmpeg info struct is %+v", vfi)
+	log.Printf("-- getVideoFileInformations : ffmpeg info struct is %+v", vfi)
 	log.Printf("-- getVideoFileInformations done successfully")
 	return
 }
@@ -2511,7 +2511,7 @@ func packageContents(contentUuids []ContentsUuid) (errSave error) {
 		stmt, err = db.Prepare(query)
 		if err != nil {
 			errSave = err
-			log.Printf("XX Cannot prepare query %s: %s", query, err)
+			log.Printf("packageContents : cannot prepare query %s: %s", query, err)
 			continue
 		}
 		defer stmt.Close()
@@ -2519,7 +2519,7 @@ func packageContents(contentUuids []ContentsUuid) (errSave error) {
 		rows, err = stmt.Query(cu.ContentId)
 		if err != nil {
 			errSave = err
-			log.Printf("XX Cannot query %s with (%d): %s", query, cu.ContentId, err)
+			log.Printf("packageContents : cannot query %s with (%d): %s", query, cu.ContentId, err)
 			continue
 		}
 		defer rows.Close()
@@ -2529,29 +2529,29 @@ func packageContents(contentUuids []ContentsUuid) (errSave error) {
 			err = rows.Scan(&filename)
 			if err != nil {
 				errSave = err
-				log.Printf("XX Cannot scan rows for query %s: %s", query, err)
+				log.Printf("packageContents : cannot scan rows for query %s: %s", query, err)
 				continue
 			}
 			filenames = append(filenames, filename)
 		}
-		log.Printf("cu is %#v", cu)
-		log.Printf("filename to package: %#v", filenames)
+		log.Printf("-- packageContents : cu is %#v", cu)
+		log.Printf("-- packageContents : filename to package: %#v", filenames)
 		var uspPackageArgs []string
 		uspPackageArgs = append(uspPackageArgs, path.Dir(filenames[0]))
 		uspPackageArgs = append(uspPackageArgs, cu.Uuid+`.ism`)
 		uspPackageArgs = append(uspPackageArgs, filenames...)
 		cmd := exec.Command(uspPackagePath, uspPackageArgs...)
-		log.Printf("-- Starting command %s %v", uspPackagePath, uspPackageArgs)
+		log.Printf("-- packageContents : starting command %s %v", uspPackagePath, uspPackageArgs)
 		err = cmd.Start()
 		if err != nil {
 			errSave = err
-			log.Printf("XX Cannot start command %s %v: %s", uspPackagePath, uspPackageArgs, err)
+			log.Printf("packageContents : cannot start command %s %v: %s", uspPackagePath, uspPackageArgs, err)
 			continue
 		}
 		err = cmd.Wait()
 		if err != nil {
 			errSave = err
-			log.Printf("XX Error while packaging with %s %v: %s", uspPackagePath, uspPackageArgs, err)
+			log.Printf("packageContents : error while packaging with %s %v: %s", uspPackagePath, uspPackageArgs, err)
 			continue
 		}
 	}
@@ -2576,10 +2576,10 @@ func uuidToContentId(uuid string) (contentId int, err error) {
 func getSubtitles(url string, dest string) (err error) {
 	log.Printf("-- getSubtitles...")
 	var resp *http.Response
-	log.Printf("fetch subtitle at url %s to %s", url, dest)
+	log.Printf("-- getSubtitles : fetch subtitle at url %s to %s", url, dest)
 	resp, err = http.Get(url)
 	if err != nil {
-		tools.LogOnError(err, "Failed to GET url %s", url)
+		tools.LogOnError(err, "getSubtitles : failed to GET url %s", url)
 		return
 	}
 	defer resp.Body.Close()
@@ -2591,7 +2591,7 @@ func getSubtitles(url string, dest string) (err error) {
 	var f *os.File
 	f, err = os.Create(dest)
 	if err != nil {
-		tools.LogOnError(err, "Failed to GET url %s", url)
+		tools.LogOnError(err, "getSubtitles : failed to GET url %s", url)
 		return
 	}
 	defer f.Close()
@@ -2615,9 +2615,9 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	log.Printf("-- transcode v1...")
 	//DATA -->
 	if jt.ProfileId == 0 {
-		errStr := fmt.Sprintf("transcode : profileId is missing")
-		log.Printf(errStr)
-		err = errors.New("profileId is missing")
+		errStr := fmt.Sprintf("'profileId' is missing")
+		log.Printf("transcode : " + errStr)
+		err = errors.New(errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2626,31 +2626,37 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	db := database.OpenGormDb()
 	defer db.Close()
 	//Loading content
+	log.Printf("-- transcode : loading content contentId=%d...", contentId)
 	var content database.Content
 	if db.Where(database.Content{ID: contentId}).First(&content).RecordNotFound() {
 		log.Printf("transcode : no content with contentId=%d", contentId)
 		sendError(w, fmt.Sprintf("no content with contentId=%d", contentId))
 		return
 	}
+	log.Printf("-- transcode : loading content contentId=%d done successfully", contentId)
 	//Loading Profile
+	log.Printf("-- transcode : loading profile profileId=%d...", jt.ProfileId)
 	var profile database.Profile
 	if db.Where(database.Profile{ID: jt.ProfileId}).First(&profile).RecordNotFound() {
 		log.Printf("transcode : no profile with profileId=%d", jt.ProfileId)
 		sendError(w, fmt.Sprintf("no content with profileId=%d", jt.ProfileId))
 		return
 	}
+	log.Printf("-- transcode : loading profile profileId=%d done successfully", jt.ProfileId)
 	//Loading presets
+	log.Printf("-- transcode : loading presets profileId=%d...", jt.ProfileId)
 	var presets []*database.Preset
 	db.Where(database.Preset{ProfileId: jt.ProfileId}).Order("presetIdDependance").Find(&presets)
+	log.Printf("-- transcode : loading presets profileId=%d done successfully", jt.ProfileId)
 	var errMsg []string
 	profilesParameters := map[string]string{}
 	for _, preset := range presets {
-		log.Printf("-- transcode : presets looping...")
+		log.Printf("-- transcode : presets looping presetId=%d...", preset.ID)
 		var re *regexp.Regexp
 		regexpStr := "%([a-z]+[a-zA-Z]*)%"
 		re, err = regexp.Compile(regexpStr)
 		if err != nil {
-			errStr := fmt.Sprintf("transcode : Cannot compile regexp %s: %s", regexpStr, err)
+			errStr := fmt.Sprintf("transcode : cannot compile regexp %s: %s", regexpStr, err)
 			log.Printf(errStr)
 			sendError(w, err.Error())
 			return
@@ -2664,7 +2670,7 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 				log.Printf("-- transcode : presets looping : profilesParameters %s=%s", v[1], m[v[1]].(string))
 			}
 		}
-		log.Printf("-- transcode : presets looping done")
+		log.Printf("-- transcode : presets looping presetId=%d done successfully", preset.ID)
 	}
 	if errMsg != nil {
 		errStr := fmt.Sprintf("failed to load profilesParameters, errors=%s", strings.Join(errMsg, ","))
@@ -2674,10 +2680,15 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 		return
 	}
 	//Loading %_USP% Profile
+	log.Printf("-- transcode : loading USP profile...")
 	USPProfile := database.Profile{}
-	db.Joins("JOIN contentsProfiles ON contentsProfiles.profileId = profiles.profileId").
+	if db.Joins("JOIN contentsProfiles ON contentsProfiles.profileId = profiles.profileId").
 		Where("contentsProfiles.contentId = ? AND profiles.name LIKE ?", content.ID, "%_USP%").
-		First(&USPProfile)
+		First(&USPProfile).RecordNotFound() {
+		log.Printf("-- transcode : loading USP profile done successfully,	 none found")
+	} else {
+		log.Printf("-- transcode : loading USP profile done successfully, found profileId=%d", USPProfile.ID)
+	}
 	//
 	baseContentFilename := path.Base(content.Filename)
 	extension := filepath.Ext(baseContentFilename)
@@ -2689,6 +2700,7 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	var assets = []database.Asset{}
 	//
 	//--> DATABASE WRITING
+	log.Printf("-- transcode : database transaction...")
 	tx := db.Begin()
 	for _, preset := range presets {
 		outputFilename := encodedBasePath + "/origin/vod/" + contentFilenameBase + "/" + content.Uuid + "_" + preset.Name
@@ -2722,7 +2734,9 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 		}
 		log.Printf("-- transcode : outputFilename is %s", outputFilename)
 		//DELETE EXISTING
+		log.Printf("-- transcode : asset deletion contentId=%d, presetId=%d...", content.ID, preset.ID)
 		tx.Delete(database.Asset{}, "contentId = ? AND presetId = ?", content.ID, preset.ID)
+		log.Printf("-- transcode : asset deletion contentId=%d, presetId=%d done successfully", content.ID, preset.ID)
 		//CREATE NEW ONE
 		log.Printf("-- transcode : asset creation...")
 		var asset database.Asset
@@ -2732,17 +2746,19 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 			asset = database.Asset{ContentId: content.ID, PresetId: preset.ID, AssetIdDependance: assetIdDependance, Filename: outputFilename, DoAnalyze: preset.DoAnalyze}
 		}
 		tx.Create(&asset)
-		log.Printf("-- transcode : asset creation done, ID=%d", asset.ID)
+		log.Printf("-- transcode : asset creation done successfully, assetId=%d", asset.ID)
 		for k, v := range profilesParameters {
 			//DELETE EXISTING
 			//TODO : NCO : Is this really needed as we have just created the asset, nothing related to it should alredy exist...
 			//TODO : NCO : parameter is useful when deleting ? Should we not delete all parameters related to the asset/profile ?
+			log.Printf("-- transcode : profilesParameter deletion contentId=%d, presetId=%d, k=%s...", profile.ID, asset.ID, k)
 			tx.Delete(database.ProfilesParameter{}, "profileId=? AND assetId=? AND parameter=?", profile.ID, asset.ID, k)
+			log.Printf("-- transcode : profilesParameter deletion contentId=%d, presetId=%d, k=%s done successfully", profile.ID, asset.ID, k)
 			//CREATE NEW ONE
 			log.Printf("-- transcode : looping profilesParameter creation...")
 			profilesParameter := database.ProfilesParameter{ProfileId: profile.ID, AssetId: asset.ID, Parameter: k, Value: v}
 			tx.Create(&profilesParameter)
-			log.Printf("-- transcode : looping profilesParameter creation done, ID=%s", profilesParameter.ID)
+			log.Printf("-- transcode : looping profilesParameter creation done successfully, profilesParameterId=%s", profilesParameter.ID)
 		}
 		assets = append(assets, asset)
 		presetToAssetIdMap[preset.ID] = asset.ID
@@ -2750,6 +2766,7 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	content.State = "scheduled"
 	tx.Save(&content)
 	tx.Commit()
+	log.Printf("-- transcode : database transaction done successfully")
 	//<-- DATABASE WRITING
 	jsonPfTranscodeResponse := JsonPfTranscodeResponse{}
 	for _, asset := range assets {
@@ -2762,6 +2779,7 @@ func transcode1(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 		sendError(w, err.Error())
 		return
 	}
+	log.Printf("-- transcode : result=%s", result)
 	w.Write(result)
 	log.Printf("-- transcode v1 done successfully")
 	return
@@ -2777,8 +2795,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	var stmt *sql.Stmt
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2786,8 +2804,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	var rows *sql.Rows
 	rows, err = stmt.Query(jt.ProfileId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2798,8 +2816,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 		var cmdLine string
 		err = rows.Scan(&cmdLine)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot scan query %s: %s", query, err)
+			log.Printf("transcode : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -2807,8 +2825,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 		regexpStr := "%([a-z]+[a-zA-Z]*)%"
 		re, err = regexp.Compile(regexpStr)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot compile regexp %s: %s", regexpStr, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot compile regexp %s: %s", regexpStr, err)
+			log.Printf("transcode : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -2831,8 +2849,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	query = "SELECT p.profileId FROM contentsProfiles AS cp LEFT JOIN profiles AS p ON cp.profileId=p.profileId WHERE contentId=? AND p.name LIKE '%_USP%'"
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2846,8 +2864,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	query = "SELECT filename,uuid FROM contents WHERE contentId=?"
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2856,8 +2874,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	var uuid string
 	err = stmt.QueryRow(contentId).Scan(&contentFilename, &uuid)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2868,16 +2886,16 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	query = fmt.Sprintf("SELECT presetId,CONCAT('%s/origin/vod/%s/%s_',`name`),presetIdDependance,doAnalyze FROM presets AS pr WHERE pr.profileId=? ORDER BY pr.presetIdDependance", encodedBasePath, contentFilenameBase, uuid)
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	defer stmt.Close()
 	rows, err = stmt.Query(jt.ProfileId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2895,8 +2913,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	query = "DELETE FROM assets WHERE contentId=? AND presetId=?"
 	stmt, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2906,8 +2924,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	var stmt2 *sql.Stmt
 	stmt2, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2917,8 +2935,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	var stmt3 *sql.Stmt
 	stmt3, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2928,8 +2946,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	var stmt4 *sql.Stmt
 	stmt4, err = db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2938,16 +2956,16 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	query = "INSERT INTO contentsProfiles (`contentId`, `profileId`) VALUES (?,?)"
 	stmt5, err := db.Prepare(query)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Cannot prepare query %s: %s", query, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("cannot prepare query %s: %s", query, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
 	defer stmt5.Close()
 	_, err = stmt5.Exec(contentId, jt.ProfileId)
 	if err != nil {
-		errStr := fmt.Sprintf("XX Error during query execution %s with (%d,%d): %s", query, contentId, jt.ProfileId, err)
-		log.Printf(errStr)
+		errStr := fmt.Sprintf("error during query execution %s with (%d,%d): %s", query, contentId, jt.ProfileId, err)
+		log.Printf("transcode : " + errStr)
 		sendError(w, err.Error())
 		return
 	}
@@ -2955,8 +2973,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 	for rows.Next() {
 		err = rows.Scan(&presetId, &outputFilename, &presetIdDependance, &doAnalyze)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot scan query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot scan query %s: %s", query, err)
+			log.Printf("transcode : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -2986,8 +3004,8 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 		var result sql.Result
 		_, err = stmt.Exec(contentId, presetId)
 		if err != nil {
-			errStr := fmt.Sprintf("XX Error during query execution %s with (%d,%d): %s", query, contentId, presetId, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("error during query execution %s with (%d,%d): %s", query, contentId, presetId, err)
+			log.Printf("transcode : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
@@ -2997,31 +3015,31 @@ func transcode0(w http.ResponseWriter, r *http.Request, jt JsonTranscode, m map[
 			result, err = stmt2.Exec(contentId, presetId, *assetIdDependance, outputFilename, doAnalyze)
 		}
 		if err != nil {
-			errStr := fmt.Sprintf("XX Error during query execution %s with %s: %s", query, jt.ProfileId, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("error during query execution %s with %s: %s", query, jt.ProfileId, err)
+			log.Printf("transcode : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		var assetId int64
 		assetId, err = result.LastInsertId()
 		if err != nil {
-			errStr := fmt.Sprintf("XX Cannot get last insert ID with query %s: %s", query, err)
-			log.Printf(errStr)
+			errStr := fmt.Sprintf("cannot get last insert ID with query %s: %s", query, err)
+			log.Printf("transcode : " + errStr)
 			sendError(w, err.Error())
 			return
 		}
 		for k, v := range profilesParameters {
 			_, err = stmt3.Exec(jt.ProfileId, assetId, k)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%d, %d, %s): %s", query, jt.ProfileId, assetId, k, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot Execute query %s with (%d, %d, %s): %s", query, jt.ProfileId, assetId, k, err)
+				log.Printf("transcode : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
 			_, err = stmt4.Exec(jt.ProfileId, assetId, k, v)
 			if err != nil {
-				errStr := fmt.Sprintf("XX Cannot Execute query %s with (%d, %d, %s, %s): %s", query, jt.ProfileId, assetId, k, v, err)
-				log.Printf(errStr)
+				errStr := fmt.Sprintf("cannot Execute query %s with (%d, %d, %s, %s): %s", query, jt.ProfileId, assetId, k, v, err)
+				log.Printf("transcode : " + errStr)
 				sendError(w, err.Error())
 				return
 			}
