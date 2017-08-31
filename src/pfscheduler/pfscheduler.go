@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"gopkg.in/natefinch/lumberjack.v2"
+	"io"
 	"log"
 	"os"
 	"pfscheduler/database"
@@ -11,6 +13,14 @@ import (
 )
 
 func main() {
+	log.SetOutput(io.MultiWriter(os.Stdout,
+		&lumberjack.Logger{
+			Filename:   "pfscheduler.log",
+			MaxSize:    10,
+			MaxBackups: 5,
+			MaxAge:     180,
+		}))
+
 	log.Println("-- pfscheduler starting...")
 
 	initGlobals()

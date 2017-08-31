@@ -26,8 +26,11 @@ import (
 
 var ffmpegPath = os.Getenv("FFMPEG_PATH")
 var uspPackagePath = os.Getenv("USP_PACKAGE_PATH")
+//FIXME
+var md5sumPath = "/usr/bin/md5sum"
 
 var encodedBasePath = os.Getenv("VIDEOS_ENCODED_BASE_PATH")
+
 
 type SchedulerHttpServerTask struct {
 	/* 'instance' variables */
@@ -251,7 +254,7 @@ func (h *SchedulerHttpServerTask) contentsPostHandler(w http.ResponseWriter, r *
 	}
 
 	// Compute md5sum of file datas
-	md5sum, err := exec.Command(`/usr/bin/md5sum`, *jcc.Filename).Output()
+	md5sum, err := exec.Command(md5sumPath, *jcc.Filename).Output()
 	if err != nil {
 		errStr := fmt.Sprintf("cannot execute md5sum on %s: %s", *jcc.Filename, err)
 		log.Printf("contentsPostHandler : " + errStr)
@@ -1212,7 +1215,7 @@ func (h *SchedulerHttpServerTask) contentsMd5PostHandler(w http.ResponseWriter, 
 			sendError(w, err.Error())
 			return
 		}
-		md5sum, err := exec.Command(`/usr/bin/md5sum`, filename).Output()
+		md5sum, err := exec.Command(md5sumPath, filename).Output()
 		if err != nil {
 			errStr := fmt.Sprintf("cannot execute md5sum for %s: %s", filename, err)
 			log.Printf("contentsMd5PostHandler : " + errStr)
