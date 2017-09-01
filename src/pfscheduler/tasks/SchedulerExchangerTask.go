@@ -33,7 +33,11 @@ func NewSchedulerExchangerTask(rabbitmqHost string, rabbitmqPort int, rabbitmqUs
 
 func (e *SchedulerExchangerTask) Init() bool {
 	log.Printf("-- SchedulerExchangerTask init starting...")
-	e.amqpUri = fmt.Sprintf("amqp://%s:%s@%s:%d", e.rabbitmqUser, e.rabbitmqPassword, e.rabbitmqHost, e.rabbitmqPort)
+	if e.rabbitmqUser != "" {
+		e.amqpUri = fmt.Sprintf("amqp://%s:%s@%s:%d", e.rabbitmqUser, e.rabbitmqPassword, e.rabbitmqHost, e.rabbitmqPort)
+	} else {
+		e.amqpUri = fmt.Sprintf("amqp://%s:%d", e.rabbitmqHost, e.rabbitmqPort)
+	}
 	e.initialized = true
 	log.Printf("-- SchedulerExchangerTask init done successfully")
 	return e.initialized
