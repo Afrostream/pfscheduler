@@ -153,12 +153,87 @@ func (e *SchedulerExchangerTask) connectToRabbitMQ() *amqp.Connection {
 }
 
 func (e *SchedulerExchangerTask) sendEncodingTasks() {
+	//TODO : NCO : By default 0 = means OLD CODE, will change when NEW CODE seems ready to be tested...
+	e.sendEncodingTasks0()
+}
+
+func (e *SchedulerExchangerTask) sendEncodingTasks1() {
 	ticker := time.NewTicker(time.Second * 1)
-	log.Printf("-- encoding tasks sender thread starting...")
+	log.Printf("-- encoding tasks sender : thread starting...")
 	go func() {
 		for _ = range ticker.C {
 			if e.currentChannel == nil {
-				log.Printf("-- encoding tasks sender looping continued (currentChannel is nil)")
+				log.Printf("-- encoding tasks sender : looping continued (currentChannel is nil)")
+				continue
+			}
+			db := database.OpenGormDb()
+			defer db.Close()
+			var scheduledAssets []*database.Asset
+			db.Where(database.Asset{State: "scheduled"}).Find(&scheduledAssets)
+			for _, scheduledAsset := range scheduledAssets {
+				assetOk := true
+				if scheduledAsset.AssetIdDependance != nil {
+					values := strings.Split(*scheduledAsset.AssetIdDependance, ",")
+					if len(values) > 0 {
+						for _, value := range values {
+							dependanceAssetIdStr := value
+							dependanceAssetId, err := strconv.Atoi(dependanceAssetIdStr)
+							if err != nil {
+								log.Printf("-- encoding tasks sender : scheduledAssetId=%d, cannot convert AssetIdDependance=%s, error=%s", scheduledAsset.ID, dependanceAssetIdStr, err)
+								assetOk = false
+								break
+							}
+							var dependanceAsset database.Asset
+							if db.Where(database.Asset{ID: dependanceAssetId}).First(&dependanceAsset).RecordNotFound() {
+								log.Printf("-- encoding tasks sender : scheduledAssetId=%d, cannot find dependanceAsset with ID=%d", scheduledAsset.ID, dependanceAssetId)
+								assetOk = false
+								break
+							}
+							log.Printf("-- encoding tasks sender : scheduledAssetId=%d, dependanceAssetId=%d, dependanceAssetState=%s", scheduledAsset.ID, dependanceAsset.ID, dependanceAsset.State)
+							if dependanceAsset.State != "ready" {
+								assetOk = false
+								break
+							}
+						}
+					} else {
+						log.Printf("-- encoding tasks sender : scheduledAssetId=%d, cannot split AssetIdDependance=%s", scheduledAsset.ID, scheduledAsset.AssetIdDependance)
+						continue
+					}
+				} else {
+					log.Printf("-- encoding tasks sender : scheduledAssetId=%d, no AssetIdDependance set", scheduledAsset.ID)
+				}
+				if assetOk {
+					var encoder database.Encoder
+					if db.Where("activeTasks < maxTasks").Order("load1 DESC").First(&encoder).RecordNotFound() {
+						log.Printf("-- encoding tasks sender : all encoders are full, waiting...")
+						break
+					}
+					//OK : asset READY, encoder READY
+					log.Printf("-- Encoder '%s' will take the task assetId %d", encoder.Hostname, scheduledAsset.ID)
+					body := fmt.Sprintf(`{ "hostname": "%s", "assetId": %d }`, encoder.Hostname, scheduledAsset.ID)
+					e.publishExchange(body)
+					//
+					var content database.Content
+					if db.Where(database.Content{ID: scheduledAsset.ContentId}).First(&content).RecordNotFound() {
+						//TODO
+					}
+					e.setContentState(&content, "processing")
+					//TODO : TO BE CONTINUED
+					e.resetAllContentStates()
+				}
+			}
+		}
+	}()
+	log.Printf("encoding tasks sender : thread stopped")
+}
+
+func (e *SchedulerExchangerTask) sendEncodingTasks0() {
+	ticker := time.NewTicker(time.Second * 1)
+	log.Printf("-- encoding tasks sender : thread starting...")
+	go func() {
+		for _ = range ticker.C {
+			if e.currentChannel == nil {
+				log.Printf("-- encoding tasks sender : looping continued (currentChannel is nil)")
 				continue
 			}
 			//log.Printf("-- encoding tasks sender thread looping...")
@@ -338,4 +413,15 @@ func (e *SchedulerExchangerTask) publishExchange(msg string) (err error) {
 		log.Printf("SchedulerExchangerTask : Sending message '%s' on afsm-encoders queue failed, error=%s", msg, err)
 	}
 	return
+}
+
+func (e *SchedulerExchangerTask) setContentState(content *database.Content, state string) {
+	db := database.OpenGormDb()
+	defer db.Close()
+	content.State = state
+	db.Save(content)
+}
+
+func (e *SchedulerExchangerTask) resetAllContentStates() {
+	//TODO
 }
