@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/streadway/amqp"
 	"log"
+	"os"
 	"pfscheduler/database"
 	"pfscheduler/tools"
 	"strconv"
@@ -22,6 +23,8 @@ type SchedulerExchangerTask struct {
 	initialized    bool
 	currentChannel *amqp.Channel
 	currentQueue   amqp.Queue
+	/* For test purpose only **/
+	transcodingVersion int
 }
 
 func NewSchedulerExchangerTask(rabbitmqHost string, rabbitmqPort int, rabbitmqUser string, rabbitmqPassword string) SchedulerExchangerTask {
@@ -38,6 +41,10 @@ func (e *SchedulerExchangerTask) Init() bool {
 	} else {
 		e.amqpUri = fmt.Sprintf("amqp://%s:%d", e.rabbitmqHost, e.rabbitmqPort)
 	}
+	if os.Getenv("TRANSCODING_VERSION") != "" {
+		e.transcodingVersion, _ = strconv.Atoi(os.Getenv("TRANSCODING_VERSION"))
+	}
+	log.Printf("-- SchedulerExchangerTask init : TRANSCODING_VERSION=%d", e.transcodingVersion)
 	e.initialized = true
 	log.Printf("-- SchedulerExchangerTask init done successfully")
 	return e.initialized
@@ -153,8 +160,11 @@ func (e *SchedulerExchangerTask) connectToRabbitMQ() *amqp.Connection {
 }
 
 func (e *SchedulerExchangerTask) sendEncodingTasks() {
-	//TODO : NCO : By default 0 = means OLD CODE, will change when NEW CODE seems ready to be tested...
-	e.sendEncodingTasks0()
+	if e.transcodingVersion == 1 {
+		e.sendEncodingTasks1()
+	} else {
+		e.sendEncodingTasks0()
+	}
 }
 
 func (e *SchedulerExchangerTask) sendEncodingTasks1() {
@@ -162,66 +172,70 @@ func (e *SchedulerExchangerTask) sendEncodingTasks1() {
 	log.Printf("-- encoding tasks sender : thread starting...")
 	go func() {
 		for _ = range ticker.C {
-			if e.currentChannel == nil {
-				log.Printf("-- encoding tasks sender : looping continued (currentChannel is nil)")
-				continue
-			}
-			db := database.OpenGormDb()
-			defer db.Close()
-			var scheduledAssets []*database.Asset
-			db.Where(database.Asset{State: "scheduled"}).Find(&scheduledAssets)
-			for _, scheduledAsset := range scheduledAssets {
-				assetOk := true
-				if scheduledAsset.AssetIdDependance != nil {
-					values := strings.Split(*scheduledAsset.AssetIdDependance, ",")
-					if len(values) > 0 {
-						for _, value := range values {
-							dependanceAssetIdStr := value
-							dependanceAssetId, err := strconv.Atoi(dependanceAssetIdStr)
-							if err != nil {
-								log.Printf("-- encoding tasks sender : scheduledAssetId=%d, cannot convert AssetIdDependance=%s, error=%s", scheduledAsset.ID, dependanceAssetIdStr, err)
-								assetOk = false
-								break
+			func() {
+				if e.currentChannel == nil {
+					log.Printf("-- encoding tasks sender : looping continued (currentChannel is nil)")
+					return
+				}
+				db := database.OpenGormDb()
+				defer db.Close()
+				var scheduledAssets []*database.Asset
+				db.Where(database.Asset{State: "scheduled"}).Find(&scheduledAssets)
+				for _, scheduledAsset := range scheduledAssets {
+					assetOk := true
+					if scheduledAsset.AssetIdDependance != nil {
+						values := strings.Split(*scheduledAsset.AssetIdDependance, ",")
+						if len(values) > 0 {
+							for _, value := range values {
+								dependanceAssetIdStr := value
+								dependanceAssetId, err := strconv.Atoi(dependanceAssetIdStr)
+								if err != nil {
+									log.Printf("encoding tasks sender : scheduledAssetId=%d, cannot convert AssetIdDependance=%s, error=%s", scheduledAsset.ID, dependanceAssetIdStr, err)
+									assetOk = false
+									break
+								}
+								var dependanceAsset database.Asset
+								if db.Where(database.Asset{ID: dependanceAssetId}).First(&dependanceAsset).RecordNotFound() {
+									log.Printf("-- encoding tasks sender : scheduledAssetId=%d, cannot find dependanceAsset with ID=%d", scheduledAsset.ID, dependanceAssetId)
+									assetOk = false
+									break
+								}
+								log.Printf("-- encoding tasks sender : scheduledAssetId=%d, dependanceAssetId=%d, dependanceAssetState=%s", scheduledAsset.ID, dependanceAsset.ID, dependanceAsset.State)
+								if dependanceAsset.State != "ready" {
+									assetOk = false
+									break
+								}
 							}
-							var dependanceAsset database.Asset
-							if db.Where(database.Asset{ID: dependanceAssetId}).First(&dependanceAsset).RecordNotFound() {
-								log.Printf("-- encoding tasks sender : scheduledAssetId=%d, cannot find dependanceAsset with ID=%d", scheduledAsset.ID, dependanceAssetId)
-								assetOk = false
-								break
-							}
-							log.Printf("-- encoding tasks sender : scheduledAssetId=%d, dependanceAssetId=%d, dependanceAssetState=%s", scheduledAsset.ID, dependanceAsset.ID, dependanceAsset.State)
-							if dependanceAsset.State != "ready" {
-								assetOk = false
-								break
-							}
+						} else {
+							log.Printf("encoding tasks sender : scheduledAssetId=%d, cannot split AssetIdDependance=%s", scheduledAsset.ID, scheduledAsset.AssetIdDependance)
+							continue
 						}
 					} else {
-						log.Printf("-- encoding tasks sender : scheduledAssetId=%d, cannot split AssetIdDependance=%s", scheduledAsset.ID, scheduledAsset.AssetIdDependance)
-						continue
+						log.Printf("-- encoding tasks sender : scheduledAssetId=%d, no AssetIdDependance set", scheduledAsset.ID)
 					}
-				} else {
-					log.Printf("-- encoding tasks sender : scheduledAssetId=%d, no AssetIdDependance set", scheduledAsset.ID)
+					if assetOk {
+						var encoder database.Encoder
+						if db.Where("activeTasks < maxTasks AND TIMESTAMPDIFF(SECOND, updatedAt, CURRENT_TIMESTAMP) <= 1").Order("load1 ASC").First(&encoder).RecordNotFound() {
+							log.Printf("-- encoding tasks sender : all encoders are full, waiting...")
+							continue
+						}
+						//OK : asset READY, encoder READY
+						log.Printf("-- Encoder '%s' will take the task assetId %d", encoder.Hostname, scheduledAsset.ID)
+						body := fmt.Sprintf(`{ "hostname": "%s", "assetId": %d }`, encoder.Hostname, scheduledAsset.ID)
+						e.publishExchange(body)
+						//NCO : HACK (so pfencoder has time to update its activeTasks + load1)
+						time.Sleep(1 * time.Second)
+						//
+						var content database.Content
+						if db.Where(database.Content{ID: scheduledAsset.ContentId}).First(&content).RecordNotFound() {
+							log.Printf("encoding tasks sender : cannot find content with ID=%", scheduledAsset.ContentId)
+							continue
+						}
+						e.setContentState(&content, "processing")
+					}
 				}
-				if assetOk {
-					var encoder database.Encoder
-					if db.Where("activeTasks < maxTasks").Order("load1 DESC").First(&encoder).RecordNotFound() {
-						log.Printf("-- encoding tasks sender : all encoders are full, waiting...")
-						break
-					}
-					//OK : asset READY, encoder READY
-					log.Printf("-- Encoder '%s' will take the task assetId %d", encoder.Hostname, scheduledAsset.ID)
-					body := fmt.Sprintf(`{ "hostname": "%s", "assetId": %d }`, encoder.Hostname, scheduledAsset.ID)
-					e.publishExchange(body)
-					//
-					var content database.Content
-					if db.Where(database.Content{ID: scheduledAsset.ContentId}).First(&content).RecordNotFound() {
-						//TODO
-					}
-					e.setContentState(&content, "processing")
-					//TODO : TO BE CONTINUED
-					e.resetAllContentStates()
-				}
-			}
+				e.resetStateContents()
+			}()
 		}
 	}()
 	log.Printf("encoding tasks sender : thread stopped")
@@ -422,6 +436,11 @@ func (e *SchedulerExchangerTask) setContentState(content *database.Content, stat
 	db.Save(content)
 }
 
-func (e *SchedulerExchangerTask) resetAllContentStates() {
-	//TODO
+func (e *SchedulerExchangerTask) resetStateContents() {
+	db := database.OpenGormDb()
+	defer db.Close()
+	//SET CONTENTS NOT READY TO READY IF ALL ASSETS ARE READY
+	db.Exec("UPDATE contents SET state = 'ready' WHERE state <> 'ready' AND contentId NOT IN (SELECT contentId FROM assets WHERE state <> 'ready')")
+	//SET CONTENTS NOT FAILED TO FAILED IF ANY ASSET IS FAILED
+	db.Exec("UPDATE contents SET state = 'failed' WHERE state <> 'failed' AND contentId IN (SELECT contentId FROM assets WHERE state = 'failed')")
 }

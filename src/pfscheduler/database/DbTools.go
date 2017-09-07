@@ -14,7 +14,7 @@ var DbDsn string
 func OpenGormDb() (db *gorm.DB) {
 	for {
 		//See : http://jinzhu.me/gorm/database.html#connecting-to-a-database
-		db, err := gorm.Open("mysql", DbDsn+"?parseTime=true")
+		db, err := gorm.Open("mysql", DbDsn + "?parseTime=true")
 		if err == nil {
 			db.LogMode(true)
 			return db
@@ -26,7 +26,7 @@ func OpenGormDb() (db *gorm.DB) {
 
 func OpenGormDbOnce() (db *gorm.DB, err error) {
 	//See : http://jinzhu.me/gorm/database.html#connecting-to-a-database
-	db, err = gorm.Open("mysql", DbDsn+"?parseTime=true")
+	db, err = gorm.Open("mysql", DbDsn + "?parseTime=true")
 	if err != nil {
 		tools.LogOnError(err, "Failed to connect to the database %s, error=%s", DbDsn, err)
 	}
@@ -35,7 +35,7 @@ func OpenGormDbOnce() (db *gorm.DB, err error) {
 
 //DEPRECATED
 func OpenDb() (db *sql.DB) {
-	db, err := sql.Open("mysql", DbDsn)
+	db, err := sql.Open("mysql", DbDsn + "?parseTime=true")
 	tools.LogOnError(err, "Cannot open database %s", DbDsn)
 	err = db.Ping()
 	tools.LogOnError(err, "Cannot ping database %s", DbDsn)
